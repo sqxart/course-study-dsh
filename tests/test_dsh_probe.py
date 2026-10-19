@@ -50,7 +50,7 @@ class ProbeTests(unittest.TestCase):
     def run_main(self, extra=()):
         args = ['--cwd', str(self.project), '--dsh-home', str(self.dsh),
                 '--agents-home', str(self.agents), '--source', str(self.source), *extra]
-        with contextlib.redirect_stdout(io.StringIO()):
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             return probe.main(args)
 
     def test_project_root_is_the_nearest_git_ancestor(self):
@@ -202,7 +202,7 @@ class ProbeTests(unittest.TestCase):
         self.install(self.agents / 'skills')
         good = self.agents / 'skills' / 'course-study-dsh'
         self.assertEqual(self.run_main(['--require-winner', str(good)]), 0)
-        self.assertEqual(self.run_main(['--require-winner', str(self.base / 'other')]), probe.EXIT_NOT_DISCOVERED)
+        self.assertEqual(self.run_main(['--require-winner', str(self.base / 'other')]), probe.EXIT_WRONG_WINNER)
 
     def test_manifest_drift_is_empty_when_files_match(self):
         target = self.agents / 'skills' / 'course-study-dsh'

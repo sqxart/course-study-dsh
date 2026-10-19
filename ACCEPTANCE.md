@@ -1,6 +1,6 @@
 # 外部验收清单（5 步）
 
-给另一台机器或另一个人用：只照 [README](README.md) 和本清单，验证 1.0.3 能装、能探、能跑一节，并回报三个数字。
+给另一台机器或另一个人用：只照 [README](README.md) 和本清单，验证 1.0.4 能装、能探、能跑一节，并回报三个数字。
 不要把本机的 `local/`、`runs/`、浏览器 profile 复制过去。
 
 ## 前置
@@ -18,7 +18,7 @@
    powershell -ExecutionPolicy Bypass -File .\install.ps1 -Force
    ```
    默认目标 `%USERPROFILE%\.agents\skills\course-study-dsh`（设了 `DSH_AGENTS_HOME` 则是 `$env:DSH_AGENTS_HOME\skills\course-study-dsh`）。
-   确认 `<target>\local\private.toml` 存在，且 `mode = "evidence"`、`submit = false`；版本看 `<target>\package-manifest.json` 的 `version`（应为 `1.0.3`）或 `doctor.py` 的 `version`；**重启/重载 DSH 会话**让技能目录刷新。
+   确认 `<target>\local\private.toml` 存在，且 `mode = "evidence"`、`submit = false`；版本看 `<target>\package-manifest.json` 的 `version`（应为 `1.0.4`）或 `doctor.py` 的 `version`；**重启/重载 DSH 会话**让技能目录刷新。
    装依赖（至少 zstandard；OCR 可选）：
    ```powershell
    pip install -r requirements.txt
@@ -34,7 +34,12 @@
    - `tools.verdict: "candidate"`、exit 0；
    - `copies >= 1`，且 `winner.skill_file` 指向你刚装的 `<target>\SKILL.md`；
    - `source_is_installed_copy: false`、`manifest_drift_files: 0`。
-   如果在安装目录里跑探针，`source_is_installed_copy` 会是 true，drift 变成“安装 vs manifest 哈希”的自检；能查篡改，但不能证明和源码一致。探针只读文件系统、不查询运行期 catalog；`copies >= 1` 只证明文件在发现根里，重启后仍以 DSH 的技能列表/实际调用为准。再**不带** `--tools` 跑一次，期望 `tools.verdict: "unknown"`、exit 0（unknown 不等于没有浏览器）。
+   把 `--require-winner` 指向一个错误目录时，应 **exit 6**、stderr 带 `winner-mismatch`；`--require-discovered` 找不到副本时 **exit 5**、`not-discovered`。两者不再混用同一个 exit code。
+   如果在安装目录里跑探针，`source_is_installed_copy` 会是 true，drift 变成“安装 vs manifest 哈希”的自检；能查篡改，但不能证明和源码一致。探针只读文件系统、不查询运行期 catalog；`copies >= 1` 只证明文件在发现根里，重启后仍以 DSH 的技能列表/实际调用为准。再**不带** `--tools` 跑一次（两个 require 参数保留）：
+   ```powershell
+   python .\scripts\dsh_probe.py --agents-home <agents home> --require-discovered --require-winner <target>
+   ```
+   期望 `tools.verdict: "unknown"`、exit 0（unknown 不等于没有浏览器）。
 
 3. **环境**：
    ```powershell
@@ -63,6 +68,16 @@
    python <target>\scripts\toc_status.py runs\<task>\toc-after.yml --prefix <章号>
    ```
    回报：调用数、会话 token、任务点前后、`submit audit`。
+
+## 同机替代（没有第二台机器时）
+
+步骤 1–3 可以在这台机器上用**临时 `DSH_AGENTS_HOME`** 走一遍，不碰真实安装：
+
+1. `$env:DSH_AGENTS_HOME = "$env:TEMP\same-machine-agents"`，按步骤 1 默认安装（不用 `-Target`）；安装和探针必须在同一个 shell，`--require-winner <target>` 防止探针回落到真实安装。
+2. 按步骤 2/3 在同一环境跑探针与 `doctor.py`；期望 `copies >= 1`、`winner` 是临时 target、`source_is_installed_copy: false`、`manifest_drift_files: 0`、`resources-ready`。
+3. 步骤 4–5 用一次**证据模式**节点（可以是另一门课的小节，不提交测验），按步骤 4/5 留 `evidence.json`、`session_cost --audit-submit` 和任务点快照。
+
+这只证明“打包、文档、本机环境、证据模式节点”能走通，**不是外部验收**：另一台机器的登录/网络/权限差异、测验只读是否占作答次数、以及“陌生人”对文档的理解仍未被真正独立验证。报告里写“同机替代”，不要写成另一台机器的通过。
 
 ## 通过标准
 

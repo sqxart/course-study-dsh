@@ -37,6 +37,8 @@
 | 学习通 · 地球历史 1.2.1（预跑） | 498.3 s 视频（锁 1x）+ 1 道弹题；**证据模式只读测验、未提交**；任务点 2→1 |
 | 学习通 · 地球历史 1.2.2（复测） | 409.0 s 视频（锁 1x）+ 1 道弹题；证据模式只读、未提交；任务点 2→1；19 次 / 0.80M token |
 
+- 1.2.1/1.2.2 的只读测验在平台“学习记录 → 章节测验详情”里显示 **已查看**、无分数、不是“已完成”；**是否占用作答次数仍未验证**。
+
 ## 单节点成本与预算
 
 <运行日期>，两次用子 agent 独占浏览器、单标签跑完整节（视频 + 弹题 + 章节测验），分别量三件事：
@@ -96,7 +98,7 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1 -Target C:\path\to\course
 
 ```powershell
 # <agents home> = %USERPROFILE%\.agents，或你设置的 $env:DSH_AGENTS_HOME
-python .\scripts\dsh_probe.py --tools tools.json --agents-home <agents home>
+python .\scripts\dsh_probe.py --tools tools.json --agents-home <agents home> --require-discovered --require-winner <target>
 ```
 
 如果只能用安装副本里的探针（例如只有安装包），它默认 `--source` 就是自己，`manifest_drift_files` 会走“安装副本 vs 安装时记录在 `package-manifest.json` 的哈希”的自检；这能查篡改，但不能证明和源码一致。输出里 `source_is_installed_copy: true` 就是这种自比。
@@ -106,7 +108,7 @@ python .\scripts\dsh_probe.py --tools tools.json --agents-home <agents home>
 - `--agents-home <...\agents>`：agents home，里面是 `skills\course-study-dsh`；
 - `--custom-root <...\skills>`：技能根，里面直接是 `course-study-dsh`；
 - `--require-discovered`：扫不到任何安装副本时 exit 5；
-- `--require-winner <target>`：`winner` 不是这个安装目录时 exit 5，防止环境变量丢了却找到旧安装。
+- `--require-winner <target>`：`winner` 不是这个安装目录时 exit 6（stderr 带 `winner-mismatch`），防止环境变量丢了却找到旧安装；`--require-discovered` 仍是 exit 5（`not-discovered`）。
 
 `--tools` 的相对路径按**当前工作目录**解析；把 `tools.json` 放在当前目录，或写绝对路径。清单就是工具名 JSON 数组，让 Agent 把当前工具列表写成 `["read", "mcp__browser__browser_click", ...]` 即可。单技能不用加 `--name`。
 

@@ -90,8 +90,8 @@ profile `desktop` 的 `cordis.patch.yml` 里已经 `insert` 了一行 `mcp-brows
 ```
 
    改完重载或重启 harness，新工具名形如 `mcp__browser__browser_navigate`。stdio 启动失败时读 harness 日志排查，不要反复重装。
-3. 用当前工具清单跑 `python scripts/dsh_probe.py --tools <工具清单.json> --out <本次运行目录>/probe.json`。
-   退出码 0 且列出候选只表示“有候选通道”；标签、跨帧、点击、页面脚本、截图、下载、登录态仍要逐项实测。
+3. 用当前工具清单跑 `python scripts/dsh_probe.py --tools <工具清单.json> --require-discovered --require-winner <安装目录> --out <本次运行目录>/probe.json`。
+   退出码 0 且列出候选只表示“有候选通道”；标签、跨帧、点击、页面脚本、截图、下载、登录态仍要逐项实测。`--require-discovered` 失败 exit 5，`--require-winner` 发现别的安装 exit 6。
 4. 首次登录由用户在该浏览器窗口手动完成，之后按 [网课流程](../references/course-flow.md) 与 [学习通](../references/chaoxing.md) 走一个未完成节点。
 5. 该 server 条目的 `toolCallTimeoutMs` 默认 60000ms；长时间等待不要压在单次调用里。
 

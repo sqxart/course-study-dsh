@@ -9,6 +9,8 @@ node_modules/
 __pycache__/
 *.pyc
 credentials.local.json
+/tools.json
+/tools-offline.json
 **/state.json
 **/runner.log
 **/edge-profile/

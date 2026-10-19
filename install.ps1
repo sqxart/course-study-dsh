@@ -45,5 +45,5 @@ if (Test-Path $configPath) {
     Write-Host "config:    $configPath (missing; public default evidence/no-submit)"
 }
 Write-Host 'verify with (run from the source repo; needs a tools.json):'
-Write-Host "  python `"$PSScriptRoot\scripts\dsh_probe.py`" --tools tools.json --require-discovered"
+Write-Host "  python `"$PSScriptRoot\scripts\dsh_probe.py`" --tools tools.json --require-discovered --require-winner `"$Target`""
 Write-Host 'then restart the DeepSeek Harness session so the skill catalog refreshes.'

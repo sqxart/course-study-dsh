@@ -15,6 +15,7 @@ ROOT_ORDER = ('project-dsh', 'project-agents', 'custom', 'user-dsh', 'user-agent
 BROWSER_PATTERN = re.compile(r'(browser|playwright|puppeteer|selenium|webdriver|devtools|cdp)')
 SHA256_HEX = re.compile(r'^[0-9a-f]{64}$', re.I)
 EXIT_NOT_DISCOVERED = 5
+EXIT_WRONG_WINNER = 6
 CAVEAT = ('Filesystem roots only. An embedded or runtime-registered skill with the same name '
           'could shadow this copy; the harness catalog and the loaded base directory stay authoritative.')
 
@@ -295,14 +296,22 @@ def main(argv=None):
             write_atomic(args.out, json.dumps(report, ensure_ascii=False, indent=2))
         print(json.dumps(report if args.full else summary(report), ensure_ascii=False, indent=2))
         if args.require_discovered and not report['discovery']['copies']:
+            print(json.dumps({'status': 'error', 'error': 'not-discovered',
+                              'message': 'no installed copy was found in the scanned roots'},
+                             ensure_ascii=False), file=sys.stderr)
             return EXIT_NOT_DISCOVERED
         if args.require_winner:
             expected = Path(args.require_winner).expanduser()
             if expected.name != 'SKILL.md':
                 expected = expected / 'SKILL.md'
             winner = report['discovery']['winner']
-            if not winner or Path(winner['skill_file']).resolve() != expected.resolve():
-                return EXIT_NOT_DISCOVERED
+            actual = winner['skill_file'] if winner else None
+            if not winner or Path(actual).resolve() != expected.resolve():
+                print(json.dumps({'status': 'error', 'error': 'winner-mismatch',
+                                  'expected': str(expected.resolve()),
+                                  'winner': actual},
+                                 ensure_ascii=False), file=sys.stderr)
+                return EXIT_WRONG_WINNER
         blocked = report['capability']['live_course_work'] == 'blocked'
         if blocked and not args.allow_offline:
             return 1
