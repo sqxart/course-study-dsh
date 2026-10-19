@@ -230,14 +230,15 @@ async (page) => {
         raw: (t.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 110)
       };
     });
-    return { workId: g('#workId'), workAnswerId: g('#workAnswerId'), timu, bodyH: document.body.scrollHeight, innerW: window.innerWidth };
+    return { workId: g('#workId'), workAnswerId: g('#workAnswerId'), addTimes: g('#addTimes'), limitWorkSubmitTimes: g('#limitWorkSubmitTimes'), timu, bodyH: document.body.scrollHeight, innerW: window.innerWidth };
   });
   return { ok: true, shot: SHOT, meta };
 }
 ```
 
 - **不点任何 `li[qid]`、不点「提交」**。证据模式只读；是否提交由 `private.toml` 的 `mode`/`submit` 决定，且必须已有授权。
-- 打开答题页会生成 `#workAnswerId`（本次 1.2.1 = 900007），平台“学习记录 → 章节测验详情”里会标成**已查看**（没有分数、不是已完成）。它不等于提交，也不等于得分；**是否占用作答次数仍未验证**。只读前先看测验限次说明，打开后不要重开；不想留下查看记录就别打开。
+- 打开答题页会生成 `#workAnswerId`（1.2.1 = 900007），平台“学习记录 → 章节测验详情”里会标成**已查看**（没有分数、不是已完成）。它不等于提交，也不等于得分。
+- 1.2.3 只读实测：打开后 `#addTimes=0`、`#limitWorkSubmitTimes=100`，没有提交/start 请求，任务点仍 2——**打开本身没有消耗提交次数**。仍会留下“已查看”；限次=1 的课未单独验证。只读前先看限次说明，打开后不要重开；不想留下查看记录就别打开。
 - 截图后跑 OCR（窄页面直接打印全部行）：
 
 ```powershell

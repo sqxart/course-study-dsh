@@ -1,13 +1,13 @@
 # 外部验收清单（5 步）
 
-给另一台机器或另一个人用：只照 [README](README.md) 和本清单，验证 1.0.4 能装、能探、能跑一节，并回报三个数字。
+给另一台机器或另一个人用：只照 [README](README.md) 和本清单，验证 1.0.5 能装、能探、能跑一节，并回报三个数字。
 不要把本机的 `local/`、`runs/`、浏览器 profile 复制过去。
 
 ## 前置
 
 - **步骤 1–3 不需要浏览器和课程账号**：Windows + Python 3.10+ + Node/npx；`pip install` 需要网络（zstandard 必需，OCR 可选）。
 - **步骤 4–5 才需要**：一个能登录学习通的 DSH 浏览器 profile（`mcp-browser` 通道已配置并能打开课程页），以及一个可以跑的小节。
-- 公开默认证据模式**不提交**章节测验。注意：打开答题页会生成 `#workAnswerId`，它不等于提交，**是否占用作答次数未验证**；先看该测验的限次说明，打开后不要重开。
+- 公开默认证据模式**不提交**章节测验。打开答题页会生成 `#workAnswerId`，它不等于提交；已观察到打开后 `#addTimes=0`、`#limitWorkSubmitTimes=100`、没有消耗提交次数的情形，但会留下“已查看”。限次=1 的课未单独验证；先看限次说明，打开后不要重开。
 
 ## 五步
 
@@ -18,7 +18,7 @@
    powershell -ExecutionPolicy Bypass -File .\install.ps1 -Force
    ```
    默认目标 `%USERPROFILE%\.agents\skills\course-study-dsh`（设了 `DSH_AGENTS_HOME` 则是 `$env:DSH_AGENTS_HOME\skills\course-study-dsh`）。
-   确认 `<target>\local\private.toml` 存在，且 `mode = "evidence"`、`submit = false`；版本看 `<target>\package-manifest.json` 的 `version`（应为 `1.0.4`）或 `doctor.py` 的 `version`；**重启/重载 DSH 会话**让技能目录刷新。
+   确认 `<target>\local\private.toml` 存在，且 `mode = "evidence"`、`submit = false`；版本看 `<target>\package-manifest.json` 的 `version`（应为 `1.0.5`）或 `doctor.py` 的 `version`；**重启/重载 DSH 会话**让技能目录刷新。
    装依赖（至少 zstandard；OCR 可选）：
    ```powershell
    pip install -r requirements.txt
@@ -55,7 +55,7 @@
      ```
      返回 `OK`、exit 0；记录里写明 `do-not-submit`/证据不足；
    - 回目录后这一节的任务点**只掉视频那一项**（常见是 `2 → 1`，剩下的 1 是未提交的测验）；若 `2 → 0`，说明测验被提交或平台点亮了它，必须查清，不能当作通过；
-   - 没有对章节测验点过选项或提交；打开过就记下 `workAnswerId`，不重开。
+   - 没有对章节测验点过选项或提交；打开过就记下 `workAnswerId`、`#addTimes`、`#limitWorkSubmitTimes`，不重开。记录本次的次数与任务点是否变化。
    - 可选核对：课程页“学习记录 → 章节测验详情”里这一节应显示**已查看**、没有分数、不是“已完成”。这个详情页可能新开标签，看完立即关掉；不要点“查看”重开测验。
 
 5. **量成本**：子 agent 的 id 就是 `%USERPROFILE%\.dsh\sessions\<workspace-key>\<agent-id>\session.v4.jsonl.zstd` 的目录名（从 `list_agents` 取）：
