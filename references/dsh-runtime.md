@@ -105,7 +105,7 @@ profile `desktop` 的 `cordis.patch.yml` 里已经 `insert` 了一行 `mcp-brows
 6. 刷新目录核对任务点，记录平台读数；不用条目数推算完成率。
 
 任何一步结果不明，先查平台记录与已有证据，不重复提交、不重开尝试、不重放旧链接。
-作业模式只给参考解答，不代填代交；不扩展到全账号课程或不明计时考试。
+不扩展到全账号课程或不明计时考试。
 
 ## 等待、批量与恢复
 
@@ -253,6 +253,61 @@ python scripts/ocr_guard.py <截图.png> runs/<run>/ocr-<节点>.json --out runs
 
 ## v24 目录布局与倍速（历史版本）
 
+v24 新布局与旧 mooc2 目录不同：旧的 `#cur<chapterId>` 选择器可能不存在。
+
+- 课程入口 `v24.chaoxing.com/courselist/opencoursenewfy?...` 会跳到 `mooc2-ans/mycourse/stu`；目录在 iframe `frame_content-zj` 里，条目是 `li > generic > link`，链接文本形如 `<节号> <章节标题> <未完成任务点数>`。
+- **链接末尾的数字是未完成任务点数**：看完后消失。这是最便宜的完成证据——不用 OCR，也不用等「已完成任务点」。
+- 点条目 → `mooc1.chaoxing.com/mycourse/studentstudy?chapterId=...`；视频在 `mooc1.chaoxing.com/ananas/modules/video/index.html` 的嵌套帧里，帧内 `performance` 仍是取字幕的位置。
+- 倍速菜单是 `span.vjs-menu-item-text`，选项 `2x / 1.5x / 1.25x / 1x`。**优先点菜单项**（官方动作）；菜单点不动才退回 `video.playbackRate = 2`，并在记录里注明"属性写入"而不是"菜单选择"。
+- 实测：381.16 s 的 1.1 以 2x 静音播完，用 187 s；回目录后 1.1 的尾部任务点数消失、1.2–1.19 仍在 → **2x 被平台正常计入**。这门课没有弹题，观察器一次跑到底，没有 282 s 空转。
+- 代价：首次遇到新布局花了约 24 次调用（探索）；按上面的配方应压到 6–8 次。
+
+## 节点级隔离与调用预算（M1）
+
+跨节点积累上下文会放大调用成本；每节点独立会话可限制累积。
+
+- **每节点一个新会话**（或一个独占浏览器的子 agent）。主会话只收节点结果，不再累积上下文。
+- **子 agent 契约**：自己把证据写到 `runs/<节点>/evidence.json`（视频时长、实际倍率、弹题题干与引文、workId/workAnswerId、调用数），最终只回传一段紧凑 JSON；不开新标签、不碰别的课程、不提交未授权测验。
+- **合并调用**（一次 evaluate 内完成）：点目录项进节点 → 找 `<video>` 帧 + 静音 + 选速率 + 起播 + 抓 `allsubtitle` → 一次 `pwsh` 落盘字幕 → 观察器。
+- **观察器预算按速率缩放**：`预算 ≈ min(剩余秒数 / rate + 60s, 1500s)`。<时长>秒的 MCP 单次上限会把 15 分钟的视频切成 3–4 个回合：实测 35 次 <时长>秒空转、合计 2.76 小时。要把 `mcp-browser` 的 `toolCallTimeoutMs` 提到 1800s 左右再跑长视频——**这个改动会让 MCP 重载，登录态可能丢失，只在节点边界做**。
+- 验收线：单节点 ≤ 8 次调用、≤ 1.5M token（现状 15.3 次 / 8.4M）。
+
+v24 布局下的 4 次调用配方（跨帧不能合并，所以按帧拆）：
+
+```js
+// 第 2 次调用：点倍速菜单（官方动作）+ 静音 + 起播 + 抓 allsubtitle
+async () => {
+  const find = (pick) => {
+    const stack = [window];
+    while (stack.length) {
+      const w = stack.pop();
+      let d; try { d = w.document; } catch (e) { continue; }
+      if (!d) continue;
+      const hit = pick(d);
+      if (hit) return hit;
+      for (let i = 0; i < w.frames.length; i++) { try { stack.push(w.frames[i]); } catch (e) {} }
+    }
+    return null;
+  };
+  // 菜单收着时先点 .vjs-playback-rate 展开
+  const opener = find((d) => d.querySelector('.vjs-playback-rate'));
+  if (opener) opener.click();
+  await new Promise((r) => setTimeout(r, 300));
+  const item = find((d) => [...d.querySelectorAll('span.vjs-menu-item-text')]
+    .find((s) => s.textContent.trim() === '2x'));
+  let rateSource = 'menu';
+  if (item) { item.click(); await new Promise((r) => setTimeout(r, 300)); }
+  const video = find((d) => d.querySelector('video'));
+  if (!video) return { ok: false, reason: 'no-video' };
+  if (video.playbackRate !== 2) { video.playbackRate = 2; rateSource = 'property'; }
+  video.muted = true;
+  await video.play();
+  return { ok: true, rate: video.playbackRate, rateSource, duration: video.duration };
+}
+```
+
+观察器随后单独一次调用（预算按速率缩放）；结束回目录读尾部任务点数。**记录里必须写明 `rateSource`**：`menu` 是官方动作，`property` 是退路。
+
 ## 本次结论
 
 已核实的通道事实：技能发现与安装根；文件系统探针；`pwsh` 实际为 Windows PowerShell 5.1，前台超时转后台 job，大输出截断并给完整路径；`web_fetch` 无登录态。浏览器能力来自本机 profile 里 `insert` 的 Playwright MCP（25 个 `mcp__browser__*`），不是 harness 内置浏览器。
@@ -288,4 +343,4 @@ python scripts/ocr_guard.py <截图.png> runs/<run>/ocr-<节点>.json --out runs
 - 实测最小化下静音 1x 播放速率正常，弹题、选项填写、章节测验提交和刷新核对都可在最小化下完成；元素截图在最小化下仍可读。
 - 不要把"课程标签是否在前台"当成播放前提；若观察到时间推进异常，先回读 `currentTime` 再判断，别急着重新起播。
 
-仍未验证：下载/上传、`icourse163`/`polymas` 等其他平台、多标签并发稳定性。平台侧曾出现一次多终端登录提醒，避免并发标签。
+仍未验证：下载/上传、`icourse163` 等其他平台、多标签并发稳定性。平台侧曾出现一次多终端登录提醒，避免并发标签。

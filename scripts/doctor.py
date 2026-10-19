@@ -1,4 +1,4 @@
-﻿"""Report this skill's local capabilities without changing the environment."""
+"""Report this skill's local capabilities without changing the environment."""
 import importlib.util
 import json
 from pathlib import Path
@@ -25,15 +25,15 @@ def version(command):
 def main():
     root = Path(__file__).resolve().parent.parent
     result = {
-        'skill': 'course-study-dsh', 'version': '2.1.0-dsh.2',
+        'skill': 'course-study-dsh', 'version': '1.0.0',
         'python': {'path': sys.executable, 'version': sys.version.split()[0]},
         'node': version('node'), 'typst': version('typst'),
         'reader': question_reader.doctor(),
         'pdf_checks': {name: importlib.util.find_spec(name) is not None
                        for name in ('pymupdf', 'pypdf', 'reportlab')},
         'resources': {name: (root / name).is_file() for name in (
-            'SKILL.md', 'references/dsh-runtime.md',
-            'references/chaoxing.md', 'references/homework-flow.md', 'references/course-flow.md',
+            'SKILL.md', 'README.md', 'NOTICE', 'references/dsh-runtime.md',
+            'references/chaoxing.md', 'references/course-flow.md',
             'scripts/dsh_probe.py', 'scripts/option_coverage.py', 'scripts/ocr_guard.py')},
         'browser': {'checked': False, 'reason': 'Use the current harness supported tools; no live session was opened.'},
         'notes': ['Optional OCR/document dependencies do not block DOM or screenshot workflows.',

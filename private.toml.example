@@ -1,0 +1,21 @@
+# Copy this file to local/private.toml and edit. local/ is gitignored.
+# The skill reads it before starting a node; missing file means the public defaults.
+
+[playback]
+# 0 = use the highest rate the platform's own player menu offers.
+# 1 = conservative: never above 1x (some courses flag faster playback).
+# Any other value must exist in the menu; otherwise the skill falls back to 1x.
+rate = 0
+
+[quiz]
+# Public default: read the quiz, show the evidence, do NOT submit.
+# Set true only on an account whose owner has explicitly authorised submission.
+submit = false
+
+# Retry a chapter quiz once when it did not score full marks.
+# Requires submit = true and remaining attempts on the platform.
+redo_once = false
+
+[limits]
+# Hard stop when a node exceeds this many tool calls (guards against a stuck loop).
+max_calls_per_node = 30

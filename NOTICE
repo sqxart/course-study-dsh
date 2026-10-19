@@ -1,0 +1,27 @@
+course-study-dsh
+Copyright (c) 2026 Sqxart
+
+This project is not affiliated with, endorsed by, or supported by 超星学习通
+(Chaoxing) or any university. Use it only on accounts and courses you are
+authorised to operate.
+
+Platform knowledge in this repository (DOM selectors, class names, subtitle
+endpoints, player menu labels) was observed on the live site during our own
+sessions. No source code, font mapping table, or data file from another project
+was copied into this repository.
+
+Prior art acknowledged:
+
+- OCSJS (https://github.com/ocsjs/ocsjs, MIT) — the established userscript
+  ecosystem for the same platforms. This project shares no code with it.
+- Samueli924/chaoxing (https://github.com/Samueli924/chaoxing, GPL-3.0) — its
+  font-table and API work is widely referenced in this space. This project does
+  not embed its font tables and does not call the reporting API; question text is
+  decoded locally by OCR.
+- sansssssss1/auto-online-course-agent-skill (MIT) and
+  pigkingouo/chaoxing-chapter-test-solve (MIT) — agent-skill shaped projects that
+  appeared earlier in 2026-10. This repository was developed independently; the
+  differences are documented in README.
+
+If you believe something here is derived from your work, open an issue and it
+will be reviewed and, where warranted, removed or re-attributed.
