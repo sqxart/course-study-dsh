@@ -34,7 +34,8 @@ def main():
         'resources': {name: (root / name).is_file() for name in (
             'SKILL.md', 'README.md', 'NOTICE', 'references/dsh-runtime.md',
             'references/chaoxing.md', 'references/course-flow.md',
-            'scripts/dsh_probe.py', 'scripts/option_coverage.py', 'scripts/ocr_guard.py')},
+            'scripts/dsh_probe.py', 'scripts/option_coverage.py', 'scripts/ocr_guard.py',
+            'scripts/toc_status.py', 'scripts/session_cost.py')},
         'browser': {'checked': False, 'reason': 'Use the current harness supported tools; no live session was opened.'},
         'notes': ['Optional OCR/document dependencies do not block DOM or screenshot workflows.',
                   'Harness browser channel is not probed here; use scripts/dsh_probe.py with the current tool list.',

@@ -60,6 +60,8 @@ Harness 的通道事实、已实测范围与调用预算在 [DSH 运行说明](r
 - [裁剪重识别](scripts/crop_ocr.py)：题干漏识时按 OCR 行锚点裁剪并放大重识别；`--auto` 按题号自动定锚点。
 - [读取兜底](scripts/ocr_guard.py)：题干过短、为空或括号未闭合时自动判定并触发重识别，`--dry-run` 只看判定。
 - [作答预检](scripts/option_coverage.py)：多选提交前核对每个选项的独特词是否在原文出现；枚举题找同一 cue 的并列项，缺原文只作警告。
+- [目录状态](scripts/toc_status.py)：从一次目录快照读出每节的未完成任务点数，`--fail-if-unfinished` 可当验收闸门。
+- [会话成本](scripts/session_cost.py)：读本次会话日志，分开报告输入 / 缓存读 / 输出与每次工具调用的体积，用来核对"每节点 ≤1.5M token"这条线。
 - [列表采集](scripts/collect_task_list.js) 与 [巡检对比](scripts/inspect_tasks.py)：只读当前已加载列表；`summary`/`diff`。
 - [Harness 探针](scripts/dsh_probe.py)：`--tools` 读当前工具清单，报告技能发现根、安装副本漂移和浏览器候选；只读文件系统，不联网、不打开页面。
 - [打包](scripts/package_skill.py)：`export` 生成公开副本，`install` 生成安装副本；都拒绝覆盖已存在的目录。
