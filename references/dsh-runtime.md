@@ -2,7 +2,7 @@
 
 版本基线：DeepSeek Harness 桌面版 0.2.1-rc.2，profile `desktop`。本文件只写本机实测或当前版本包文档能互相印证的结论；历史小节只反映对应版本快照，**不等于当前能力**。其他 harness（ZCode/Codex）的 bootstrap、CDP 名称、写权限或调用时限不适用于本技能。
 
-## 当前通道（<运行日期>，1.0.7）
+## 当前通道（<运行日期>，1.0.8）
 
 profile `desktop` 的 `cordis.patch.yml` 里有两条独立的 `mcp-client` 行：
 
@@ -186,6 +186,8 @@ python scripts/subtitle_evidence.py slice --corpus runs/<run>/subtitle-<节点>.
 
 `find` 返回带时间戳的引文；`fetch` 只接受显式传入的本次 URL，不读缓存、不重放旧链接。`--corpus` 也接受 `.txt` 逐行原文（讲义、自己的转写），所以「其他原文依据」同样能过闸门。从顶层页访问内层帧时记：`contentDocument` 上没有 `performance`，资源条目要用 `frame.contentWindow.performance`；写错会静默拿到空数组，看起来像“没有字幕”。
 
+- **字幕是逐视频的**：每进一个视频都要重新判断，不要把上一节的结论套过来；没有 SRT 时跳过 `gate`，按学科知识作答并标 `low_confidence`。
+
 - **P0 语义取证闸门（先取证，再提交）**：任何语义题、判断题、观点题在提交前，先用字幕原话或其他原文核对，**不要按课程语境猜**。把说法拆成必须同时出现的 `terms`，写成问题文件后跑 `gate`：
 
 ```json
@@ -201,6 +203,10 @@ python scripts/subtitle_evidence.py gate --corpus runs/<run>/subtitle-<节点>.s
 退出码 **0** = 每题都 `supported`，记录里带 `evidence.text` 与时间戳，可以提交；退出码 **5** = 至少一题 `low-confidence`，`decision` 为 `do-not-submit`，`missing_terms` 指出缺哪个词、`partial` 表示只对上一部分。低置信时在节点记录里写明「低置信 + 缺什么证据」并告诉用户，再由用户决定；不要用常识或课程语境补位。4.1 Q4、4.3 Q3 就是这样丢分的。闸门只判断「有没有原文支撑」，不判断「原文能否推出选项」。
 
   **组合陷阱**：`terms` 必须写成「你预期的正确命题」里的词，而不是题面里的词。5.1 Q1 题面写「蜂型路线以手段为导向」，字幕里「蜂行路线」「手段」各自都出现，但属于两个不同主语的句子（蜂=目标导向，蝇=手段导向）；按题面词去查会误判为 supported。正确做法是用「蜂行路线 + 目标导向 + 管理思维」去查，查到即说明题面把主语换了，答案应为「错」。同一段文字主语一变，闸门救不了，所以闸门结论要连引文一起看。
+
+  **综合题**：答案可能综合多个子标题，`terms` 分散在不同 cue 时仍可能判 low-confidence。gate 只证明「有没有原文」，综合题要看引文并接受 `low_confidence`，不要为了过 gate 把 `window` 开到几十 cue 硬凑。
+
+  **全选陷阱**：3.4 Q1 问「亚历山大帝国统治时期已经将()全部连接了起来」，gate 在 00:04:10 同时命中地中海/印度河/咸海/波斯湾，四个选项都 supported；按全选提交，平台判 0（题库答案是四区中的子集）。gate 只证明词在原文，多选的集合要靠主语、时间和范围判断；「全部连接/全部包括」类题不要因为四个词都出现就全选。
 
 - **多选作答预检（P1）**：多选题在提交前先跑覆盖预检，把「选中项有没有原文」「枚举题是否与并列项一致」变成可判定的结果：
 
@@ -227,6 +233,8 @@ python scripts/quiz_ocr.py <截图.png> --json --out runs/<run>/ocr-<节点>.jso
 ```
 
 默认阈值 0.80；低于阈值的行仍会输出，但带 `low_confidence: true` 和 `!` 标记，平均置信度写在 `mean_confidence`。依赖缺失时退出码 3、引擎运行失败退出码 4，都不会静默返回空文本。OCR 只解决「读题」，不解决「答对」：语义题仍要过上面的 `gate`。
+
+- **窄页 OCR 会漏行**：窄答题页整页 OCR 可能漏掉题干和选项；把截图放大 2× 再跑 `quiz_ocr.py` 能恢复题干，选项仍以 DOM 或读图为准。最快兜底是 `read_image` 看一次整页截图，不要反复试裁剪。
 
 - **题区过滤与自动兜底（P2）**：整页 OCR 之后先用 `quiz_panel.py --x-min 100 --x-max 1100` 只留题区；题干只有类型标签、正文少于 8 字或带未闭合 `【` 时，用一条命令触发自动裁剪重识别：
 
@@ -341,7 +349,7 @@ async () => {
 - **外壳与目录**：`mooc2-ans/mycourse/stu?...&pageHeader=1`（章节详情），目录在 `frame_content-zj`，即 `studentcourse` iframe。每行是 `.chapter_item[onclick="toOld(courseId, chapterId, clazzId, 0)"]`，行文本形如 `1.4.1 早期地球的排气作用 2`，尾部数字是未完成任务点数。
 - **进节点与起播可以合并**：在 `studentcourse` 帧里点 `.chapter_item`（按节号过滤），等 `ananas/modules/video/index.html` 帧出现，再静音、点倍速菜单、起播——一次 `browser_run_code_unsafe` 完成；省掉单独一次 click，也没有 ref 失效问题。导航后仍要核对 `chapterId` 与节名。
 - **锁速**：这门课展开倍速菜单只有 `字幕设定/关闭字幕/公网1/公网2/高清`，没有 2x；写 `video.playbackRate=2` 会被播放器改回 1。菜单没有 2x/1.5x/1.25x 时直接记 `rateSource=locked`（预跑 1.2.1 起改用这个值，不再写属性），按 1x 播，不反复试。
-- **弹题**：`li.ans-videoquiz-opt > label > span.tkRadio > input[type=radio]`，点 radio 并回读 checked；提交点用**可见的 `a.ans-videoquiz-submit`**（1.2.1 实测点 `DIV.tkTopic_oper` 不放行、视频不续播）；必要时点 `.ans-videoquiz-continue`。`.spanHas`/`.spanNot` 是静态文案（提交前就能看到「回答正确」），不是判定；弹题是否计分页面不给。
+- **弹题**：`li.ans-videoquiz-opt > label > span.tkRadio > input[type=radio]`，点 radio 并回读 checked；提交优先用唯一 id `#videoquiz-submit`（只有类选择器时取文本为「提交」且可见的第一个；同类里还有隐藏的「提交中」，丝绸之路上直接点 `a.ans-videoquiz-submit` 会匹配 2 个锚点）。1.2.1 实测点 `DIV.tkTopic_oper` 不放行、视频不续播；必要时点 `.ans-videoquiz-continue`。`.spanHas`/`.spanNot` 是静态文案（提交前就能看到「回答正确」），不是判定；弹题是否计分页面不给。
 - **测验答案不要读文字**：待作答态的 DOM 文字是混淆字体（形如 `A 惉悻惆惈成敦就惃惄`），任何按可见文字匹配的选答都会失败。只认 `li[qid]` 的 DOM 顺序 + `span[data]` token：单选是 `A`–`D`，判断是整 token `true`/`false`，多选是字母拼接。核对 `input[name=answer<qid>]` 时按 **token 集合**比较——把 `true` 拆成字符再排序会得到 `ertu`，必然误报 `verify-mismatch`。
 - **OCR**：截图用 `f.locator('body').screenshot()`（frame body，整页高度）。Windows 控制台先 `$env:PYTHONIOENCODING='utf-8'; [Console]::OutputEncoding=[System.Text.Encoding]::UTF8`，否则中文乱码、只剩几行。`quiz_panel.py` 的 x 区间是宽屏页面的启发式；932 px 窄页的题面从 x≈39 开始，`100–1100` 会把题面全过滤掉。验收配方直接打印全部 OCR 行（约 25 行），不进面板过滤。
 - 结果页提交后是明文（我的答案/得分），可复盘；0 分不一定点亮任务点，是否点亮只看目录尾部数字。
@@ -363,7 +371,7 @@ async () => {
 37 次里只有 3 次观察器 + 2 次弹题 + 1 次起播是必需动作，其余是**可避免的探索**：
 
 1. 目录帧试探 5 次：`browser_evaluate` 读不到 `mooc2-ans` 帧（`document.domain` 隔离），改用 `browser_run_code_unsafe` 的 `page.frames()`。→ 快速配方第 1 步直接用后者。
-2. 弹题 5 次：先按旧配方点 `DIV.tkTopic_oper`，浮层不动；又探候选、再点 `a.ans-videoquiz-submit` 才放行。→ 配方改成直接点 `a.ans-videoquiz-submit`，一次读题 + 一次「作答+续播」。
+2. 弹题 5 次：先按旧配方点 `DIV.tkTopic_oper`，浮层不动；又探候选、再点 `a.ans-videoquiz-submit` 才放行。→ 配方改成直接点提交（现在优先唯一 id `#videoquiz-submit`），一次读题 + 一次「作答+续播」。
 3. 回目录再重进 6 次：视频完先回目录核对，`page.goBack()` 又回不去，改用 `a.subBack`；再进节点开测验。→ 配方固定「视频 → 弹题 → 测验 → 最后回目录一次」。
 4. 冷启动读文档/仓库 11 次：`references/quickstart.md` 就是为了把这部分压到 1–2 次。
 

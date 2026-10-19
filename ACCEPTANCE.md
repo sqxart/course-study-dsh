@@ -1,6 +1,6 @@
 # 外部验收清单（5 步）
 
-给另一台机器或另一个人用：只照 [README](README.md) 和本清单，验证 1.0.7 能装、能探、能跑一节，并回报三个数字。
+给另一台机器或另一个人用：只照 [README](README.md) 和本清单，验证 1.0.8 能装、能探、能跑一节，并回报三个数字。
 不要把本机的 `local/`、`runs/`、浏览器 profile 复制过去。
 
 ## 前置
@@ -18,7 +18,7 @@
    powershell -ExecutionPolicy Bypass -File .\install.ps1 -Force
    ```
    默认目标 `%USERPROFILE%\.agents\skills\course-study-dsh`（设了 `DSH_AGENTS_HOME` 则是 `$env:DSH_AGENTS_HOME\skills\course-study-dsh`）。
-   确认 `<target>\local\private.toml` 存在，且 `mode = "evidence"`、`submit = false`；版本看 `<target>\package-manifest.json` 的 `version`（应为 `1.0.7`）或 `doctor.py` 的 `version`；**重启/重载 DSH 会话**让技能目录刷新。
+   确认 `<target>\local\private.toml` 存在，且 `mode = "evidence"`、`submit = false`；版本看 `<target>\package-manifest.json` 的 `version`（应为 `1.0.8`）或 `doctor.py` 的 `version`；**重启/重载 DSH 会话**让技能目录刷新。
    装依赖（至少 zstandard；OCR 可选）：
    ```powershell
    pip install -r requirements.txt
@@ -89,6 +89,7 @@
   - **冷启动**（新会话从零开始）总调用目标 ≤20 次；
   - 明显超出时先查异常（目录帧试探、弹题按钮、回目录重进、重复读文档），不要为了凑数字少做验收。
   - 参考公式（1x 锁速课，热启动）：`4 + ceil(视频秒数 / 175)`。
+  - **一个子 agent 只跑一个节点**：<运行日期> 丝绸之路 10 节按“3 节点一批”跑，实测 1.73–2.16M token/节点，超过 1.5M 预算；单节点新会话是 0.49–0.80M。批处理只省了子 agent 启动，不省 token。
 
 ## 停手条件
 

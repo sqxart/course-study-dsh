@@ -54,6 +54,10 @@ class QuestionAnchorTest(unittest.TestCase):
         for text in ("一.单选题", "AI技术", "答案：A", "，1【单选题】错位"):
             self.assertFalse(cropper.question_start(text), text)
 
+    def test_section_codes_and_scores_are_not_questions(self):
+        for text in ("1.2", "1.2.3 什么是生命宜居带？", "50.0分", "2013年9月"):
+            self.assertFalse(cropper.question_start(text), text)
+
     def test_section_headers_are_recognised(self):
         self.assertTrue(cropper.section_header("一.单选题"))
         self.assertTrue(cropper.section_header("二、判断题"))
@@ -79,6 +83,18 @@ class AutoRegionTest(unittest.TestCase):
 
     def test_unsorted_lines_are_sorted_by_height(self):
         lines = [ocr_line("2【单选题】题干二", 210, 600), ocr_line("1【单选题】题干一", 210, 444)]
+        start, end, stem = cropper.auto_region(lines)
+        self.assertEqual((start[1], end[1]), (444, 600))
+        self.assertEqual(stem, "1【单选题】题干一")
+
+    def test_section_code_header_is_skipped(self):
+        lines = [
+            ocr_line("章节测验", 22, 21),
+            ocr_line("1.2", 36, 86),
+            ocr_line("1【单选题】题干一", 210, 444),
+            ocr_line("A 选项", 210, 492),
+            ocr_line("2【判断题】题干二", 210, 600),
+        ]
         start, end, stem = cropper.auto_region(lines)
         self.assertEqual((start[1], end[1]), (444, 600))
         self.assertEqual(stem, "1【单选题】题干一")

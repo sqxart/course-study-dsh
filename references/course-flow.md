@@ -26,7 +26,7 @@
 
 ## 弹题与测验
 
-弹题及时核对选中态与平台判定。点 `input[type=radio]` 后必须回读 checked；提交用当前可见的 `a.ans-videoquiz-submit`，点 `DIV.tkTopic_oper` 可能不放行（预跑 1.2.1 实测浮层不动、视频不续播）。`.spanHas`/`.spanNot` 的静态文案不是判定，弹题也不改变任务点。
+弹题及时核对选中态与平台判定。点 `input[type=radio]` 后必须回读 checked；提交优先用唯一 id `#videoquiz-submit`；旧页面只有类选择器时，取 `a.ans-videoquiz-submit` 里文本为「提交」且可见的第一个（同类里还有隐藏的「提交中」，直接点类选择器会撞 Playwright 严格模式），点 `DIV.tkTopic_oper` 可能不放行（预跑 1.2.1 实测浮层不动、视频不续播）。`.spanHas`/`.spanNot` 的静态文案不是判定，弹题也不改变任务点。
 章节测验先读实际限时、次数和已使用机会。
 进入介绍页与“开始测验”要区分；后者可能启动计时，即使有效提交次数仍为0也不能随意离开。
 

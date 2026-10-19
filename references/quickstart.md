@@ -144,7 +144,7 @@ async (page) => {
 }
 ```
 
-第二次：点 `input[type=radio]`、核对 checked、点**可见的 `a.ans-videoquiz-submit`**（不要点 `DIV.tkTopic_oper`，实测不放行），
+第二次：点 `input[type=radio]`、核对 checked、点**提交**（优先唯一 id `#videoquiz-submit`；只有类选择器时取 `a.ans-videoquiz-submit` 里文本为「提交」且可见的第一个，同类里还有隐藏的「提交中」），
 必要时点 `.ans-videoquiz-continue`，再起播并直接续一段 175 秒观察。
 
 ```js

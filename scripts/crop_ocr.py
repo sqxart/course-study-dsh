@@ -7,7 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-QUESTION = re.compile(r'^\s*\d{1,3}\s*(?:[.、．)）]\s*|【|\[)')
+QUESTION = re.compile(r'^\s*\d{1,3}\s*(?:【|\[|[.、．)）](?!\d))')
 SECTION = re.compile(r'^\s*(?:[一二三四五六七八九十]+|[ⅠⅡⅢⅣⅤ]+)\s*[、.．]')
 
 
