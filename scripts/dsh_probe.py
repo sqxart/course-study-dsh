@@ -13,6 +13,8 @@ GIT_MARKER = '.git'
 # Project roots are resolved from the session cwd; user roots come from the profile home.
 ROOT_ORDER = ('project-dsh', 'project-agents', 'custom', 'user-dsh', 'user-agents')
 BROWSER_PATTERN = re.compile(r'(browser|playwright|puppeteer|selenium|webdriver|devtools|cdp)')
+SHA256_HEX = re.compile(r'^[0-9a-f]{64}$', re.I)
+EXIT_NOT_DISCOVERED = 5
 CAVEAT = ('Filesystem roots only. An embedded or runtime-registered skill with the same name '
           'could shadow this copy; the harness catalog and the loaded base directory stay authoritative.')
 
@@ -87,11 +89,21 @@ def manifest_drift(skill_dir, source_root):
             continue
         source = source_root / relative
         installed = skill_dir / relative
+        if not installed.is_file():
+            items.append({'kind': 'manifest-missing-in-install', 'path': relative})
+            continue
+        installed_hash = sha256_file(installed)
+        recorded = entry.get('sha256') if isinstance(entry, dict) else None
+        # The installed copy can check itself against the hashes recorded at
+        # install time. Without this, running the probe from the install dir
+        # compares the copy with itself and drift is always empty.
+        if isinstance(recorded, str) and SHA256_HEX.match(recorded):
+            if installed_hash != recorded.lower():
+                items.append({'kind': 'manifest-hash-mismatch', 'path': relative})
+                continue
         if not source.is_file():
             items.append({'kind': 'missing-in-source', 'path': relative})
-        elif not installed.is_file():
-            items.append({'kind': 'missing-in-install', 'path': relative})
-        elif sha256_file(source) != sha256_file(installed):
+        elif sha256_file(source) != installed_hash:
             items.append({'kind': 'hash-mismatch', 'path': relative})
     return items, manifest.get('version')
 
@@ -148,6 +160,8 @@ def build_report(cwd=None, name=SKILL_NAME, tools=None, source_root=None,
     copies = skill_copies(roots, name)
     source = source_skill(source_root, name)
     winner = min(copies, key=lambda copy: copy['rank']) if copies else None
+    source_is_installed_copy = any(
+        Path(copy['root_dir']).resolve() == Path(source['source_root']).resolve() for copy in copies)
     drift = [{'source': copy['source'], 'rank': copy['rank'], 'skill_file': copy['skill_file'],
               'sha256': copy['sha256'], 'matches_source': copy.get('sha256') == source.get('sha256')}
              for copy in copies if copy.get('sha256') != source.get('sha256')]
@@ -195,7 +209,8 @@ def build_report(cwd=None, name=SKILL_NAME, tools=None, source_root=None,
         'cwd': str(Path(cwd or os.getcwd())),
         'discovery': {'scope': 'filesystem-roots-only', 'caveat': CAVEAT, 'roots': roots,
                       'copies': copies, 'winner': winner, 'drift': drift,
-                      'manifest_drift': manifest_items, 'source': source},
+                      'manifest_drift': manifest_items, 'source': source,
+                      'source_is_installed_copy': source_is_installed_copy},
         'tools': surface,
         'capability': {
             'browser_channel': browser_channel,
@@ -222,6 +237,7 @@ def summary(report):
         'drift': sorted({item['source'] for item in discovery['drift']} |
                         {item['source'] for item in discovery.get('manifest_drift', [])}),
         'manifest_drift_files': len(discovery.get('manifest_drift', [])),
+        'source_is_installed_copy': discovery.get('source_is_installed_copy', False),
         'copies': len(discovery['copies']),
         'tools': {'provided': report['tools']['provided'], 'count': report['tools']['count'],
                   'verdict': report['tools']['verdict'],
@@ -263,6 +279,8 @@ def main(argv=None):
     parser.add_argument('--full', action='store_true', help='Print the full report instead of the summary')
     parser.add_argument('--allow-offline', action='store_true',
                         help='Exit 0 even when no browser channel is available; the report still says blocked')
+    parser.add_argument('--require-discovered', action='store_true',
+                        help='Exit 5 when no installed copy is found in the scanned roots')
     args = parser.parse_args(argv)
     try:
         tools = load_tools(args.tools) if args.tools else None
@@ -274,6 +292,8 @@ def main(argv=None):
                 raise ValueError('output exists, pass --force to replace it: ' + str(args.out))
             write_atomic(args.out, json.dumps(report, ensure_ascii=False, indent=2))
         print(json.dumps(report if args.full else summary(report), ensure_ascii=False, indent=2))
+        if args.require_discovered and not report['discovery']['copies']:
+            return EXIT_NOT_DISCOVERED
         blocked = report['capability']['live_course_work'] == 'blocked'
         if blocked and not args.allow_offline:
             return 1

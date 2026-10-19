@@ -1,6 +1,7 @@
-# Copy this file to local/private.toml and edit. local/ is gitignored.
-# The installer seeds local/private.toml from this file; a missing file means
-# the public default: mode = "evidence", submit = false.
+# Private config for this machine. The installer copies this file to
+# local/private.toml in the install directory; local/ is gitignored and is never
+# exported or uploaded. A missing local/private.toml means the public default:
+# mode = "evidence", submit = false.
 #
 # mode = "evidence"    only submit answers backed by subtitle/original text;
 #                      a missing citation stops before submission.
@@ -16,6 +17,8 @@ rate = 0
 
 [quiz]
 # Public default: read the quiz, show the evidence, do NOT submit.
+# Opening the answer page may create an attempt record on the platform; check the
+# quiz's attempt limit before letting the skill open it.
 # Set true only on an account whose owner has explicitly authorised submission.
 submit = false
 
@@ -24,5 +27,7 @@ submit = false
 redo_once = false
 
 [limits]
-# Hard stop when a node exceeds this many tool calls (guards against a stuck loop).
+# Advisory budget, not a code gate: the executor records the call count in
+# evidence.json and flags overruns. 30 is the warm-node target; a cold run can
+# exceed it (the 1.2.1 pre-run used 37 calls, the 1.2.2 retest 19).
 max_calls_per_node = 30

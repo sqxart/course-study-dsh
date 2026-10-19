@@ -35,7 +35,15 @@ if ($LASTEXITCODE -ne 0) { throw "package_skill.py install failed with exit code
 
 Write-Host ''
 Write-Host "installed: $Target" -ForegroundColor Green
-Write-Host "config:    $Target\local\private.toml (default: evidence mode, no submission)"
-Write-Host 'verify with:'
-Write-Host "  python `"$Target\scripts\dsh_probe.py`" --name course-study-dsh"
+$configPath = Join-Path $Target 'local\private.toml'
+if (Test-Path $configPath) {
+    $configText = Get-Content $configPath -Raw
+    $mode = if ($configText -match '(?m)^\s*mode\s*=\s*"([^"]+)"') { $Matches[1] } else { '?' }
+    $submit = if ($configText -match '(?m)^\s*submit\s*=\s*(true|false)') { $Matches[1] } else { '?' }
+    Write-Host "config:    $configPath (mode=$mode, submit=$submit)"
+} else {
+    Write-Host "config:    $configPath (missing; public default evidence/no-submit)"
+}
+Write-Host 'verify with (run from the source repo; needs a tools.json):'
+Write-Host "  python `"$PSScriptRoot\scripts\dsh_probe.py`" --tools tools.json --require-discovered"
 Write-Host 'then restart the DeepSeek Harness session so the skill catalog refreshes.'

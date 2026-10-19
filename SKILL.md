@@ -12,7 +12,7 @@ Harness 的通道事实、已实测范围与调用预算在 [DSH 运行说明](r
 
 1. 确认当前工具面：`mcp__browser__browser_*`、`pwsh`、`read/edit`。缺少受支持的浏览器通道时只做离线工作，不去找隐藏调试接口或自建 CDP 脚本。
 2. 先读 `local/private.toml`：没有文件就按证据模式（`mode=evidence`、`submit=false`）；有则按其 `mode` 与 `submit` 执行，并在记录里写明本次模式。然后确定平台、课程、账号别名、任务类型与已有授权；续跑先读 `local/CURRENT_HANDOFF.md` 与 `local/active-session.json`，再核验平台实际状态。
-   **证据模式**下章节测验只读：打开答题页、截图/OCR、摆证据，**不点选项、不点提交、不重开**；视频和弹题照常完成。打开答题页可能生成 `#workAnswerId`（不等于提交，是否占用次数未验证），先看限次说明再打开。
+   **证据模式**下章节测验只读：打开答题页、截图/OCR、摆证据，**不点选项、不点提交、不重开**；视频和弹题照常完成。打开答题页可能生成 `#workAnswerId`（不等于提交，是否占用次数未验证），先看限次说明再打开；用户明确不想冒次数风险时，停在目录并报告“测验未打开”，不要自行打开。
 3. 按任务只读所需材料：
 
    | 任务 | 流程 | 平台知识 |
@@ -66,7 +66,7 @@ Harness 的通道事实、已实测范围与调用预算在 [DSH 运行说明](r
 - [会话成本](scripts/session_cost.py)：读本次会话日志，分开报告输入 / 缓存读 / 输出与每次工具调用的体积，用来核对"每节点 ≤1.5M token"这条线；`--audit-submit` 扫描工具调用里的测验提交选择器。
 - [证据检查](scripts/check_evidence.py)：按 `state.md` 的 evidence 结构核对一次节点记录；证据模式默认要求 `submitted=false`，`--require-readonly` 再加"0 选项点击 / 0 提交点击"。
 - [列表采集](scripts/collect_task_list.js) 与 [巡检对比](scripts/inspect_tasks.py)：只读当前已加载列表；`summary`/`diff`。
-- [Harness 探针](scripts/dsh_probe.py)：`--tools` 读当前工具清单，报告技能发现根、安装副本漂移和浏览器候选；只读文件系统，不联网、不打开页面。
+- [Harness 探针](scripts/dsh_probe.py)：`--tools` 读当前工具清单，报告技能发现根、安装副本漂移和浏览器候选；`--require-discovered` 扫不到安装副本时 exit 5；只读文件系统，不联网、不打开页面。
 - [打包](scripts/package_skill.py)：`export` 生成公开副本，`install` 生成安装副本；都拒绝覆盖已存在的目录。
 
 题面与列表的采集函数不自动执行，调用契约见 [工具数据格式](references/tool-data.md)；用新批次隔离题面和字体。

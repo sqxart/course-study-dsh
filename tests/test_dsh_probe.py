@@ -1,4 +1,5 @@
 import contextlib
+import hashlib
 import importlib.util
 import io
 import json
@@ -169,6 +170,33 @@ class ProbeTests(unittest.TestCase):
         self.assertIn(('manifest-missing-in-install', 'scripts/gone.py'), kinds)
         self.assertIn('user-agents', probe.summary(result)['drift'])
         self.assertEqual(probe.summary(result)['manifest_drift_files'], 2)
+
+    def test_manifest_self_check_detects_tampering_when_source_is_the_install(self):
+        target = self.agents / 'skills' / 'course-study-dsh'
+        self.write(target / 'SKILL.md', SKILL_TEXT)
+        manifest = {'version': '1.0.1', 'files': [
+            {'path': 'SKILL.md', 'sha256': hashlib.sha256(SKILL_TEXT.encode()).hexdigest()},
+        ]}
+        self.write(target / 'package-manifest.json', json.dumps(manifest))
+        self.write(target / 'SKILL.md', SKILL_TEXT + 'tampered\n')
+        result = probe.build_report(cwd=self.project, source_root=target,
+                                    dsh_home=self.dsh, agents_home=self.agents)
+        kinds = {(item['kind'], item['path']) for item in result['discovery']['manifest_drift']}
+        self.assertIn(('manifest-hash-mismatch', 'SKILL.md'), kinds)
+        self.assertTrue(probe.summary(result)['source_is_installed_copy'])
+        self.assertEqual(probe.summary(result)['manifest_drift_files'], 1)
+
+    def test_source_is_installed_copy_is_reported(self):
+        target = self.install(self.agents / 'skills')
+        self.assertTrue(probe.summary(probe.build_report(
+            cwd=self.project, source_root=target.parent, dsh_home=self.dsh,
+            agents_home=self.agents))['source_is_installed_copy'])
+        self.assertFalse(probe.summary(self.report())['source_is_installed_copy'])
+
+    def test_require_discovered_exits_five_without_a_copy(self):
+        self.assertEqual(self.run_main(['--require-discovered']), probe.EXIT_NOT_DISCOVERED)
+        self.install(self.agents / 'skills')
+        self.assertEqual(self.run_main(['--require-discovered']), 0)
 
     def test_manifest_drift_is_empty_when_files_match(self):
         target = self.agents / 'skills' / 'course-study-dsh'

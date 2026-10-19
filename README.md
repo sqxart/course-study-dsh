@@ -73,25 +73,48 @@ python scripts/toc_status.py runs/<task>/toc-after.yml --prefix 1.4
 
 ## 安装
 
-需要 Python 3.10+ 和 Node/npx（浏览器通道用）。把仓库放到 DSH 的技能根，或直接跑：
+需要 Python 3.10+（本机实测 3.14.7）和 Node/npx（浏览器通道用）。装到 DSH 能发现的位置：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\install.ps1
-# 已有安装想就地升级：.\install.ps1 -Force（保留 local/ 配置）
+# 已有安装就地升级（保留 local/ 配置）：
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -Force
 ```
 
-安装脚本会把 `private.toml.example` 复制成 `<安装目录>\local\private.toml`（默认证据模式），
-默认装到 `%USERPROFILE%\.agents\skills\course-study-dsh`；设了 `DSH_AGENTS_HOME` 就用 `$env:DSH_AGENTS_HOME\skills\course-study-dsh`。
+默认装到 `%USERPROFILE%\.agents\skills\course-study-dsh`；设了 `DSH_AGENTS_HOME` 就装到 `$env:DSH_AGENTS_HOME\skills\course-study-dsh`。
+装完**重启或重载 DSH 会话**，技能目录才会刷新；探针本身不需要重载。
 
-装完在 DSH 里用**绝对路径**跑探针：
+只想验证打包、或装到别的目录（DSH 不会自动发现，除非把它加进发现根）：
 
 ```powershell
-python "$env:USERPROFILE\.agents\skills\course-study-dsh\scripts\dsh_probe.py" --tools <当前工具清单.json>
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -Target C:\path\to\course-study-dsh
 ```
 
-- 带 `--tools`：有浏览器形状的工具就 `candidate`（exit 0），明确没有就 `blocked`（exit 1）。清单就是一份工具名 JSON 数组，让 Agent 把当前工具列表写成 `["read", "mcp__browser__browser_click", ...]` 即可。
-- 不带 `--tools`：只证明文件系统发现，`verdict: unknown`、exit 0——不会把“没提供清单”说成“没有浏览器”。
-- `drift` 按安装目录的 `package-manifest.json` 全量比对，不只看 `SKILL.md`。
+`-Target` 的最后一级目录名必须正好是 `course-study-dsh`；父目录不必预先建；目标必须不存在或为空，`-Force` 就地升级。安装脚本把 `private.toml.example` 种成 `<安装目录>\local\private.toml`（默认 evidence / 不提交），已有 `local/private.toml` 不会被覆盖。输出里的 `uploaded: false` 是固定值：脚本不上传任何文件。
+
+装完在**源码仓库根目录**跑探针（这样 `--source` 默认是仓库，能把安装副本和源码比对）：
+
+```powershell
+# <agents home> = %USERPROFILE%\.agents，或你设置的 $env:DSH_AGENTS_HOME
+python .\scripts\dsh_probe.py --tools tools.json --agents-home <agents home>
+```
+
+如果只能用安装副本里的探针（例如只有安装包），它默认 `--source` 就是自己，`manifest_drift_files` 会走“安装副本 vs 安装时记录在 `package-manifest.json` 的哈希”的自检；这能查篡改，但不能证明和源码一致。输出里 `source_is_installed_copy: true` 就是这种自比。
+
+**安装和探针必须在同一个 shell/环境变量下**：`DSH_AGENTS_HOME` 同时决定安装目标和探针的发现根。新 shell 丢了变量时，探针可能找到旧安装或 0 份，exit 仍是 0。要显式指：
+
+- `--agents-home <...\agents>`：agents home，里面是 `skills\course-study-dsh`；
+- `--custom-root <...\skills>`：技能根，里面直接是 `course-study-dsh`；
+- `--require-discovered`：扫不到任何安装副本时 exit 5，适合验收脚本。
+
+`--tools` 的相对路径按**当前工作目录**解析；把 `tools.json` 放在当前目录，或写绝对路径。清单就是工具名 JSON 数组，让 Agent 把当前工具列表写成 `["read", "mcp__browser__browser_click", ...]` 即可。单技能不用加 `--name`。
+
+看输出里的这些字段，不要只看 exit 0：
+
+- `tools.verdict`：`candidate`（有浏览器形状的工具，仍未验证）/ `none`（没有）/ `unknown`（没给清单）。没有时 exit 1，`capability.live_course_work` 才是 `blocked`。
+- `copies` / `winner`：文件系统发现了几份安装、哪一份 rank 最小。**`candidate` 只证明工具面，不证明你刚装的副本会被加载**；`copies: 0` 说明安装目录不在发现根里——改装到默认根，或用上面的参数指过去再跑（`--require-discovered` 会让这种情况 exit 5）。
+- `manifest_drift_files` / `drift`：与 `package-manifest.json` 比对的差异；0 = 没有差异。`source_is_installed_copy: true` 表示比的是“安装副本 vs manifest 哈希”，false 表示比的是“安装 vs 源码”。
+- 不带 `--tools`：只证明文件系统发现，`tools.verdict: unknown`、exit 0——不会把“没提供清单”说成“没有浏览器”。
 
 依赖：
 
@@ -129,18 +152,23 @@ rate = 0            # 0 = 平台允许的最高档；填 1 强制保守
 [quiz]
 submit = false      # 动作开关：false 时连证据答案也不提交
 redo_once = false
+
+[limits]
+max_calls_per_node = 30   # 建议预算，不是代码门禁；超限写进 evidence.deviations
 ```
 
-- `mode = "evidence"`：只提交有字幕/原文支撑的答案；找不到就停在证据页，写 `do-not-submit`。
+- `mode = "evidence"`：只允许提交有字幕/原文支撑的答案；`submit=false` 时连有支撑的答案也不提交，停在证据页写 `do-not-submit`。
 - `mode = "completion"`：允许按学科知识推断并提交，记录里标 `low_confidence=true`，只建议在本人账号上用。
 - 技能开始前读这个文件来决定本次模式；它是流程约定，不是内核强制——绕过它的责任在使用者。
+- `max_calls_per_node` 是建议预算，没有代码会因超限而停；超了要写进 `evidence.deviations`，并用 `session_cost.py` 复核。
 - 公开包默认 `evidence` + `submit=false`；本机要完成优先，就自己改成 `completion` + `submit=true`。
 
 ## 风险
 
 1. **账号风险**：任何自动化播放都可能被平台判定异常。本项目不伪造心跳，但不保证不被风控。
 2. **配置不是内核门禁**：`submit` 与 `mode` 由技能开始时读取，没有代码强制；默认关，打开后责任在使用者。
-3. **实证范围有限**：一个账号、三门课（人工智能与创业智慧 84/84；示例课程10 1.1/1.2；地球历史 5 个小节，其中 1.2.1 只跑到证据模式、未提交测验）。
+3. **实证范围有限**：一个账号、三门课（人工智能与创业智慧 84/84；示例课程10 1.1/1.2；地球历史 6 个小节，其中 1.2.1/1.2.2 只跑到证据模式、未提交测验）。
+4. **证据模式仍会打开答题页**：可能生成作答记录，是否占用次数未验证。不想冒险就在指令里明确“不要打开测验”，或先看该测验的限次说明。
 
 ## 许可证
 
