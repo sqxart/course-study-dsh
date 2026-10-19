@@ -259,6 +259,8 @@ v24 新布局与旧 mooc2 目录不同：旧的 `#cur<chapterId>` 选择器可�
 - **链接末尾的数字是未完成任务点数**：看完后消失。这是最便宜的完成证据——不用 OCR，也不用等「已完成任务点」。
 - 点条目 → `mooc1.chaoxing.com/mycourse/studentstudy?chapterId=...`；视频在 `mooc1.chaoxing.com/ananas/modules/video/index.html` 的嵌套帧里，帧内 `performance` 仍是取字幕的位置。
 - 倍速菜单是 `span.vjs-menu-item-text`，选项 `2x / 1.5x / 1.25x / 1x`。**优先点菜单项**（官方动作）；菜单点不动才退回 `video.playbackRate = 2`，并在记录里注明"属性写入"而不是"菜单选择"。
+- **属性写入会被播放器覆盖**：实测把 `playbackRate` 设成 1、读回来仍是 2——播放器按自己的菜单状态重设。所以设置后必须**读回校验**；读回不一致就记 `menu-failed`，不要声称已改速率。
+- **弹题提交后可能没有判定**：v24 播放器里点提交，弹窗直接消失，`.spanHas` / `.spanNot` / `#videoquiz-continue` 全部不可见，`#rightNum` 为 null；任务点数也不变。**提交成功 ≠ 计入**，唯一可信的验收是回目录看尾部任务点数。
 - 实测：381.16 s 的 1.1 以 2x 静音播完，用 187 s；回目录后 1.1 的尾部任务点数消失、1.2–1.19 仍在 → **2x 被平台正常计入**。这门课没有弹题，观察器一次跑到底，没有 282 s 空转。
 - 代价：首次遇到新布局花了约 24 次调用（探索）；按上面的配方应压到 6–8 次。
 
@@ -301,6 +303,7 @@ async () => {
   const video = find((d) => d.querySelector('video'));
   if (!video) return { ok: false, reason: 'no-video' };
   if (video.playbackRate !== 2) { video.playbackRate = 2; rateSource = 'property'; }
+  if (video.playbackRate !== 2) rateSource = 'rejected'; // 播放器覆盖了属性写入
   video.muted = true;
   await video.play();
   return { ok: true, rate: video.playbackRate, rateSource, duration: video.duration };
