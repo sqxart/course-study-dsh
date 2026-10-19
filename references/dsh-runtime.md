@@ -262,7 +262,7 @@ v24 新布局与旧 mooc2 目录不同：旧的 `#cur<chapterId>` 选择器可�
 - **属性写入会被播放器覆盖**：实测把 `playbackRate` 设成 1、读回来仍是 2——播放器按自己的菜单状态重设。所以设置后必须**读回校验**；读回不一致就记 `menu-failed`，不要声称已改速率。
 - **弹题提交后可能没有判定**：v24 播放器里点提交，弹窗直接消失，`.spanHas` / `.spanNot` / `#videoquiz-continue` 全部不可见，`#rightNum` 为 null；任务点数也不变。**提交成功 ≠ 计入**，唯一可信的验收是回目录看尾部任务点数。
 - **剩下的任务点通常是章节测验，不是弹题**：小节页顶部任务栏分「视频 / 章节测验」，写着「任务点已完成」说明视频那一项已经算完；任务点数还挂着 1 时，要补的是测验。
-- **v24 章节测验流程（实测两节 <成绩>分）**：点「章节测验」→ 内层 iframe `mooc1.chaoxing.com/mooc-ans/work/doHomeWorkNew?workId=...` → **对 frame body 做元素截图**（视口截图只能拍到前两题）→ `quiz_ocr.py` → `quiz_panel.py` → 从 `li[role=radio]` 读 `qid` / `qtype`（单选 `span[data]` 是 A–D，判断是 `true` / `false`）→ `li[qid=X].nth(i)` 点击 → 核对 `input[name=answer<qid>]` 与 `aria-checked` → 点 `.btnSubmit` → 主页面 `#workpop` 点「提交」→ 结果帧 `selectWorkQuestionYiPiYue` 显示「已完成 / 第1次作答 / 本次成绩」。
+- **v24 章节测验流程（实测两节 <成绩>分）**：点「章节测验」→ 内层 iframe `mooc1.chaoxing.com/mooc-ans/work/doHomeWorkNew?workId=...` → **对 frame body 做元素截图**（视口截图只能拍到前两题）→ `quiz_ocr.py` → `quiz_panel.py` → 从 `li[role=radio]` 读 `qid` / `qtype`（单选 `span[data]` 是 A–D，判断是 `true` / `false`）→ `li[qid=X].nth(i)` 点击 → 核对 `input[name=answer<qid>]` 与 `aria-checked` → 点 `.btnSubmit` → 主页面 `#workpop` 点「提交」→ 结果帧 `selectWorkQuestionYiPiYue` 显示「已完成 / 第1次作答 / 本次成绩」。**提交后该帧就是明文**（题干 + 我的答案 + 正确答案 + 得分），可直接当复盘与题库来源。旧播放器的弹题控件要点 `input[type=radio]`，v24 测验页要点 `li[qid]`，进页先探骨架。
 - 实测：381.16 s 的 1.1 以 2x 静音播完，用 187 s；回目录后 1.1 的尾部任务点数消失、1.2–1.19 仍在 → **2x 被平台正常计入**。这门课没有弹题，观察器一次跑到底，没有 282 s 空转。
 - 代价：首次遇到新布局花了约 24 次调用（探索）；按上面的配方应压到 6–8 次。
 
