@@ -38,7 +38,7 @@ Harness 的通道事实、已实测范围与调用预算在 [DSH 运行说明](r
 
 - [字幕取证](scripts/subtitle_evidence.py)：`fetch/find/gate/slice`；多个 `--query` 是 **AND**（同一 cue 必须同时含全部词）。
 - [截图 OCR](scripts/quiz_ocr.py)：整页识别；[题区过滤](scripts/quiz_panel.py)：按 x 范围把题区从整页里摘出来。
-- [裁剪重识别](scripts/crop_ocr.py)：题干漏识时按 OCR 行锚点裁剪并放大重识别；`--auto` 按题号自动定锚点。
+- [裁剪重识别](scripts/crop_ocr.py)：题干漏识时按 OCR 行锚点裁剪并放大重识别；`--auto` 按题号自动定锚点。[读取兜底](scripts/ocr_guard.py)：题干过短、为空或括号未闭合时自动判定并触发重识别，`--dry-run` 只看判定。
 - [作答预检](scripts/option_coverage.py)：多选提交前核对每个选项的独特词是否在原文出现；枚举题优先找同一 cue 的并列项。
 - [列表采集](scripts/collect_task_list.js) 与 [巡检对比](scripts/inspect_tasks.py)：只读当前已加载列表；`summary`/`diff`。
 - [交付闸门](scripts/delivery_gate.py)：按 [交付说明](references/homework-output.md) 验证产物，不代替解题与视觉复核。

@@ -194,6 +194,23 @@ python scripts/subtitle_evidence.py gate --corpus runs/<run>/subtitle-<节点>.s
 
   **组合陷阱**：`terms` 必须写成「你预期的正确命题」里的词，而不是题面里的词。5.1 Q1 题面写「蜂型路线以手段为导向」，字幕里「蜂行路线」「手段」各自都出现，但属于两个不同主语的句子（蜂=目标导向，蝇=手段导向）；按题面词去查会误判为 supported。正确做法是用「蜂行路线 + 目标导向 + 管理思维」去查，查到即说明题面把主语换了，答案应为「错」。同一段文字主语一变，闸门救不了，所以闸门结论要连引文一起看。
 
+- **多选作答预检（P1）**：多选题在提交前先跑覆盖预检，把「选中项有没有原文」「枚举题是否与并列项一致」变成可判定的结果：
+
+```json
+{"question": "三创是指", "type": "multi", "selected": ["A","C","D"],
+ "options": [{"key":"A","text":"创新"},{"key":"B","text":"创造"},
+             {"key":"C","text":"创优"},{"key":"D","text":"创业"}]}
+```
+
+```powershell
+python scripts/option_coverage.py check --corpus runs/<run>/subtitle-<节点>.srt `
+  --options runs/<run>/options-<节点>.json --brief
+```
+
+退出码 **0** = 没有阻塞项；**5** = 有阻塞项（选中项在原文里找不到，或与同一 cue 的并列项不一致），`blockers` 给出 `selected-no-evidence` / `enumeration-mismatch` / `no-selection`。并列项判定条件：同一 cue 里直接出现 3 个以上选项，或 2 个选项且该 cue 含顿号/「和、与、及」等并列符。`--out` 留完整记录，`--selected A,C` 可临时覆盖 JSON 里的选择。预检只给证据侧的事实，最终仍按内容决定；没把握时宁可少选，不要加不确定项。
+
+  已验证与已知边界：5.3 Q2 的字幕在 00:01:09.519 同一句里列出「三驾马车 算法 算力 算料」，把「数据」加进去的错误选择被 `enumeration-mismatch` 挡住；但 12.4「三创」的字幕只提「双创→三创」，从未列出三项（「创优」全片 0 次），预检找不到并列项，**无法**发现那次 0 分——`--strict` 反而会把正确答案「创优」判成缺证据。所以缺原文默认只作警告（`warnings`），只有「原文明确并列、但与选择不一致」才阻塞；答案本身仍靠学科判断。
+
 - **题面解码**：work 页面文本是 CXSecret 混淆字体，DOM 直读是乱码。用元素截图 + 本地 OCR 解成纯文本，截图落盘到允许的输出目录：
 
 ```powershell
@@ -202,6 +219,15 @@ python scripts/quiz_ocr.py <截图.png> --json --out runs/<run>/ocr-<节点>.jso
 ```
 
 默认阈值 0.80；低于阈值的行仍会输出，但带 `low_confidence: true` 和 `!` 标记，平均置信度写在 `mean_confidence`。依赖缺失时退出码 3、引擎运行失败退出码 4，都不会静默返回空文本。OCR 只解决「读题」，不解决「答对」：语义题仍要过上面的 `gate`。
+
+- **题区过滤与自动兜底（P2）**：整页 OCR 之后先用 `quiz_panel.py --x-min 100 --x-max 1100` 只留题区；题干只有类型标签、正文少于 8 字或带未闭合 `【` 时，用一条命令触发自动裁剪重识别：
+
+```powershell
+python scripts/ocr_guard.py <截图.png> runs/<run>/ocr-<节点>.json --dry-run   # 只看判定
+python scripts/ocr_guard.py <截图.png> runs/<run>/ocr-<节点>.json --out runs/<run>/stem-<节点>.png
+```
+
+`ocr_guard.py` 取题区里第一个带题号的行做题干；判定为可疑时调用 `crop_ocr.py --auto`（按题号自动定锚点，到下一个题号或「二.判断题」这类分部标题为止）再跑一次 OCR，返回 `suspect / reasons / crop_stem / reocr`。判定规则是「去掉类型标签后的正文 < 8 字，或残留未闭合括号」，不是「整行 < 8 字」——否则每个带 `【单选题】` 的正常题干都会触发。`--dry-run` 不读图片，可在决定裁剪前先看结论。
 
 - **章节测验选择态与提交**：题面在 cards 帧 → `ananas/modules/work` 帧 → 再一层答题帧。题目容器 `.TiMu`，选项分两种：判断/单选是 `li[role=radio]`，多选是 `li[role=checkbox]`，点击分别走 `addChoice` / `addMultipleChoice`。**选中态看 `li[aria-checked]` 与隐藏 `input[name=answer<qid>]`；多选写进隐藏框的字母来自 `span[data]`，不是显示顺序**；显示字母与内部 token 可能不同序，按索引或显示字母选择可能出错。正确做法：先读每个 `li` 的 `label`、`span[data]`、`aria-checked`，算出「该选 / 不该选」的差集，只点差集里的 `li`（按 label 重新查，别复用旧引用），每点一次等 300ms 再重读，最后核对隐藏值等于期望 `data` 的拼接。
   点 `.btnSubmit` 只弹出主页面 `#workpop`「提示 确认提交？」，再点其中 `a.jb_btn` 的「提交」才真正提交；结果页会出现「已完成 / 第1次作答 / 本次成绩」，并逐题给出「我的答案 / 得分」。一次只提交一次，提交后用 `#workId` 与 `#workAnswerId` 记档。

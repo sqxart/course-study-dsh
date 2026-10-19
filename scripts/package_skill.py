@@ -1,4 +1,4 @@
-"""Build an independent install or a public export; never touches old skills."""
+﻿"""Build an independent install or a public export; never touches old skills."""
 import argparse
 import hashlib
 import json
@@ -9,7 +9,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parent.parent
 SKILL_NAME = 'course-study-dsh'
-VERSION = '2.1.0-dsh.1'
+VERSION = '2.1.0-dsh.2'
 PUBLIC = ('SKILL.md', 'LICENSE', '.gitignore', 'references', 'scripts', 'tests')
 LOCAL_METADATA = ('homework-profile.md', 'legacy-paths.json', 'runtime.json')
 
