@@ -16,7 +16,7 @@ def load(name):
 
 
 package = load('package_skill')
-LINK = re.compile(r'\]\((references/[^)#]+|scripts/[^)#]+|LICENSE|NOTICE|README\.md)\)')
+LINK = re.compile(r'\]\(([^)#]+?)(?:#[^)]*)?\)')
 
 
 class MetadataTest(unittest.TestCase):
@@ -36,11 +36,15 @@ class MetadataTest(unittest.TestCase):
 
     def test_no_dangling_links_in_public_docs(self):
         missing = []
-        for doc in ('SKILL.md', 'README.md'):
-            text = (ROOT / doc).read_text(encoding='utf-8')
+        docs = [ROOT / name for name in ('SKILL.md', 'README.md', 'ACCEPTANCE.md')]
+        docs += sorted((ROOT / 'references').glob('*.md'))
+        for doc in docs:
+            text = doc.read_text(encoding='utf-8')
             for target in LINK.findall(text):
-                if not (ROOT / target).exists():
-                    missing.append('%s -> %s' % (doc, target))
+                if target.startswith(('http://', 'https://', 'mailto:')):
+                    continue
+                if not (doc.parent / target).exists():
+                    missing.append('%s -> %s' % (doc.relative_to(ROOT), target))
         self.assertEqual(missing, [])
 
     def test_removed_scope_stays_removed(self):

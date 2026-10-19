@@ -132,5 +132,54 @@ class SessionCostTest(unittest.TestCase):
         self.assertEqual(code, 2)
 
 
+class SubmitAuditTest(unittest.TestCase):
+    def test_popup_submit_is_not_a_quiz_submit(self):
+        events = [{'type': 'tool/call', 'data': {
+            'callId': 'c1', 'name': 'mcp__browser__browser_run_code_unsafe',
+            'arguments': {'code': 'await frame.locator("a.ans-videoquiz-submit").click()'}}}]
+        audit = cost.audit_submissions(events)
+        self.assertEqual(audit['verdict'], 'clean')
+
+    def test_quiz_submit_selector_is_flagged(self):
+        events = [{'type': 'tool/call', 'data': {
+            'callId': 'c1', 'name': 'mcp__browser__browser_run_code_unsafe',
+            'arguments': {'code': 'document.querySelector(".btnSubmit").click()'}}}]
+        audit = cost.audit_submissions(events)
+        self.assertEqual(audit['verdict'], 'review')
+        self.assertEqual(audit['suspects'][0]['pattern'], r'\.btnSubmit')
+
+    def test_non_browser_calls_are_not_audited(self):
+        events = [{'type': 'tool/call', 'data': {
+            'callId': 'c1', 'name': 'write', 'arguments': {'content': 'the selector .btnSubmit was never used'}}}]
+        self.assertEqual(cost.audit_submissions(events)['verdict'], 'clean')
+
+    def test_audit_flag_exits_five_on_suspect(self):
+        events = [{'type': 'tool/call', 'data': {
+            'callId': 'c1', 'name': 'mcp__browser__browser_run_code_unsafe',
+            'arguments': {'code': 'click #workpop'}}}]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'session.v4.jsonl.zstd'
+            path.write_bytes(make_session(events))
+            buffer = io.StringIO()
+            import contextlib
+            with contextlib.redirect_stdout(buffer):
+                code = cost.main([str(path), '--audit-submit'])
+        self.assertEqual(code, cost.EXIT_SUBMIT_SUSPECT)
+        self.assertIn('submit audit: review', buffer.getvalue())
+
+    def test_audit_flag_exits_zero_when_clean(self):
+        events = [{'type': 'tool/call', 'data': {
+            'callId': 'c1', 'name': 'pwsh', 'arguments': {'command': 'Get-Date'}}}]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'session.v4.jsonl.zstd'
+            path.write_bytes(make_session(events))
+            buffer = io.StringIO()
+            import contextlib
+            with contextlib.redirect_stdout(buffer):
+                code = cost.main([str(path), '--audit-submit'])
+        self.assertEqual(code, 0)
+        self.assertIn('submit audit: clean', buffer.getvalue())
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -27,6 +27,41 @@
 这是记录格式，不授予动作权限；authorization 来自当前用户与同一任务已有授权。
 `confirmed` 每项应包含对象身份、平台证据、读取时间和使用方法；没有证据的旧done不能直接计入。
 
+## 节点证据（`runs/<task>/evidence.json`）
+
+每个节点**先写这个文件再汇报**；`scripts/check_evidence.py` 按下面的结构检查，证据模式默认要求 `submitted=false`，`--require-readonly` 再加“0 选项点击 / 0 提交 / 未重开”。
+
+```json
+{
+  "schema_version": 1,
+  "kind": "node-evidence",
+  "mode": "evidence",
+  "authorization": {"source": "local/private.toml", "submit": false, "redo_once": false},
+  "course": {"title": "课程名", "course_id": 0, "clazz_id": 0},
+  "section": {"code": "1.2.1", "title": "节名", "chapter_id": ""},
+  "video": {
+    "duration_seconds": 498.32, "rate": 1, "rate_source": "locked",
+    "muted": true, "ended": true, "observer_calls": 3,
+    "subtitles": {"allsubtitle": null, "srt": [], "srt_urls": 0}
+  },
+  "popup": {"question": "题干", "selected": "D", "evidence_status": "insufficient-evidence", "low_confidence": true},
+  "quiz": {
+    "work_id": "0", "work_answer_id": null, "question_count": 5,
+    "submitted": false, "decision": "do-not-submit",
+    "options_clicked": 0, "submit_clicked": 0, "reopened": false
+  },
+  "platform": {"toc_before": {"task_points": 2}, "toc_after": {"task_points": 1}},
+  "cost": {"tool_calls": 12},
+  "deviations": ["无字幕，测验只读"]
+}
+```
+
+- `mode` 是 `evidence` 或 `completion`；`rate_source` 是 `menu` / `property` / `rejected` / `locked`。
+- `quiz.decision` 在证据模式固定写 `do-not-submit`；完成模式提交后写实际结果页读数。
+- `platform.toc_after.task_points` 只能小于等于 before；没下降写 warning，不能写成“已完成”。
+- `deviations` 写清可复现的偏差（按钮不放行、无字幕、回目录方式），空数组也要有。
+- `cost.tool_calls` 写本次会话 `tool/call` 事件数（含最后一条汇报）；节点动作数 = 这个数减 1。用 `session_cost.py` 核对。
+
 进行中测验另记录 attempt标识、是否已开始、剩余时间/截止、已保存答案清单和提交结果。
 保存时避免密码、cookie和签名链接；题目、答案与真实课程资料可以保留在本机任务目录。
 

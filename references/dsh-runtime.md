@@ -112,14 +112,14 @@ profile `desktop` 的 `cordis.patch.yml` 里已经 `insert` 了一行 `mcp-brows
 - 单次预算由 profile 里 `mcp-browser` 行的 `toolCallTimeoutMs` 决定（本机已从 90 秒提到 300 秒）。不要按固定 85 秒轮询：每次轮询都是一整轮模型调用，代价远高于返回的几十字节。
 - 视频等待用「事件驱动观察」：一次 `frame.evaluate` 在页面里每 2 秒自检，**只在状态变化时返回**——视频结束、弹题出现、意外暂停或到预算上限。一节 20 分钟的视频通常 1–3 次调用，而不是十几次。
 - 观察只读 DOM 与媒体状态，不写页面全局变量、不改播放进度；只回传 `{reason, t, duration}` 这类短状态，完整记录写本次 `runs/` 目录。
-- 观察预算要比 `toolCallTimeoutMs` 小一档（例如 270 秒对 300 秒），给通道留出返回时间；超时返回 `timeout` 就续一段，不算失败。
+- 观察预算要比 `toolCallTimeoutMs` 小一档：本机 300 秒上限下**默认 175 秒**（`4 + ceil(视频秒数/175)` 就是按这个算的）；超时返回 `timeout` 就续一段，不算失败。只有确认通道能稳定返回时才把单次调到 270 秒。
 - 一次只安排一到两个耗时动作；需要真正并行时用 `run_in_background` 加 `job_output(wait=true)`，不要把 sleep 轮询当等待。
 - 观察、动作、平台完成分别验收；DOM 文本或工具返回成功都不等于平台已保存。
 - 交接时写清账号别名、课程键、章节与媒体身份、已确认项、未知项和下一步；换执行器先停旧进程。
 
 ```js
 // 在视频帧里等待状态变化，用一个有界循环换掉逐次轮询
-const BUDGET_MS = 270000; // browser_evaluate 不传参数，预算必须写在函数里
+const BUDGET_MS = 175000; // browser_evaluate 不传参数，预算必须写在函数里
 const state = await videoFrame.evaluate(async () => {
   const v = document.querySelector('video');
   const start = performance.now();
@@ -243,7 +243,7 @@ python scripts/ocr_guard.py <截图.png> runs/<run>/ocr-<节点>.json --out runs
 2. 一次 `evaluate`：递归找含 `<video>` 的帧 → 核对 chapterId/objectid/媒体 src → `muted=true`、`rate=1`、点 `.vjs-big-play-button` → 轮询到 `currentTime>0`。
 3. 一次 `evaluate`：从所有帧的 `contentWindow.performance` 抓 `allsubtitle`，页面内 `fetch` 列表，只回传 SRT URL。
 4. 一次 `pwsh`：`subtitle_evidence.py fetch` 落盘。
-5. 一次 `evaluate`：事件观察器（2 秒自检，272 秒预算，弹题/结束/暂停即返回）。
+5. 一次 `evaluate`：事件观察器（2 秒自检，175 秒预算，弹题/结束/暂停即返回）。
 6. 弹题：一次 `evaluate` 读题干与选项 → 一次 `pwsh`（`find --brief`、必要时 `slice`、`gate --brief`）→ 一次 `evaluate` 完成「选中 + 核对 + 提交一次 + 读 `#rightNum` + 点继续 + 把余额视频看完」，返回 `ended`。
 7. 章节测验：一次 `evaluate` 点 `#dct2` 并轮询到答题帧可读 → 一次截图 → 一次 `pwsh`（`Copy-Item` + `quiz_ocr.py`）→ 一次 `pwsh` 批量 `find --brief` / `slice` / `gate --brief` → 一次 `evaluate` 选中、核对 `aria-checked` 与隐藏值、提交、确认 `#workpop`、读分。
 8. 目录复核：一次 `evaluate` 从 `a.subBack` 的 `href` 反推出本次 `studentcourse` 地址（`stuenc` = `enc`）并 `location.href` 跳转 → 一次 `evaluate` 轮询读到「已完成任务点」。
@@ -272,10 +272,10 @@ v24 新布局与旧 mooc2 目录不同：旧的 `#cur<chapterId>` 选择器可�
 
 - **每节点一个新会话**（或一个独占浏览器的子 agent）。主会话只收节点结果，不再累积上下文。
 - **子 agent 契约**：自己把证据写到 `runs/<节点>/evidence.json`（视频时长、实际倍率、弹题题干与引文、workId/workAnswerId、调用数），最终只回传一段紧凑 JSON；不开新标签、不碰别的课程、不提交未授权测验。
-- **观察器必须有界且可续**：单次调用只跑 120–<时长>秒就带 `timeout` 返回，下一回合再续。别把一个 <时长>秒的循环挂在子 agent 的唯一一次调用里——实测视频已经播完（221.7 s @2x）、平台也计入了，子 agent 却因为观察器没返回而收不了尾。**先写证据文件再返回**，这样即使被中断，事实也还在盘上。
+- **观察器必须有界且可续**：单次调用只跑 **175 秒**（本机 300 秒上限下）就带 `timeout` 返回，下一回合再续。**先写证据文件再返回**，即使被中断也能恢复。
 - **合并调用**（一次 evaluate 内完成）：点目录项进节点 → 找 `<video>` 帧 + 静音 + 选速率 + 起播 + 抓 `allsubtitle` → 一次 `pwsh` 落盘字幕 → 观察器。
-- **观察器预算按速率缩放**：`预算 ≈ min(剩余秒数 / rate + 60s, 1500s)`。<时长>秒的 MCP 单次上限会把 15 分钟的视频切成 3–4 个回合：实测 35 次 <时长>秒空转、合计 2.76 小时。要把 `mcp-browser` 的 `toolCallTimeoutMs` 提到 1800s 左右再跑长视频——**这个改动会让 MCP 重载，登录态可能丢失，只在节点边界做**。
-- 验收线：单节点 ≤ 8 次调用、≤ 1.5M token。<运行日期> 首次实测：地球历史 1.4.1 = 8 次 / 0.49M，1.3.3 = 10 次 / 0.53M（修配方前），详见下面的「M2 单节点验收」。
+- **观察器总预算按速率缩放**：`总预算 ≈ min(剩余秒数 / rate + 60s, 1500s)`，但**单次调用仍只跑 175 秒**。把 `mcp-browser` 的 `toolCallTimeoutMs` 提到 1800s 左右再跑长视频是另一条路——**会让 MCP 重载、登录态可能丢失，只在节点边界做**；默认不用。
+- 验收线：**热启动**（已读过文档、已在本课程目录）单节点浏览器调用 8–10 次；冷启动（新会话从零读文档）总调用 ≤ 20、会话 token ≤ 1.5M。实际成本按本次会话和 evidence 测量，不将目标视为保证。
 
 v24 布局下的 4 次调用配方（跨帧不能合并，所以按帧拆）：
 
@@ -312,7 +312,7 @@ async () => {
 }
 ```
 
-观察器随后单独一次调用（预算按速率缩放）；结束回目录读尾部任务点数。**记录里必须写明 `rateSource`**：`menu` 是官方动作，`property` 是退路。
+观察器随后单独一次调用（每次 175 秒，`timeout` 续）；结束回目录读尾部任务点数。**记录里必须写明 `rateSource`**：`menu` 是官方动作，`property` 是退路。
 
 ## M2 单节点验收（<运行日期> 实测）
 
@@ -332,11 +332,38 @@ async () => {
 
 - **外壳与目录**：`mooc2-ans/mycourse/stu?...&pageHeader=1`（章节详情），目录在 `frame_content-zj`，即 `studentcourse` iframe。每行是 `.chapter_item[onclick="toOld(courseId, chapterId, clazzId, 0)"]`，行文本形如 `1.4.1 早期地球的排气作用 2`，尾部数字是未完成任务点数。
 - **进节点与起播可以合并**：在 `studentcourse` 帧里点 `.chapter_item`（按节号过滤），等 `ananas/modules/video/index.html` 帧出现，再静音、点倍速菜单、起播——一次 `browser_run_code_unsafe` 完成；省掉单独一次 click，也没有 ref 失效问题。导航后仍要核对 `chapterId` 与节名。
-- **锁速**：这门课展开倍速菜单只有 `字幕设定/关闭字幕/公网1/公网2/高清`，没有 2x；写 `video.playbackRate=2` 会被播放器改回 1。记 `rateSource=rejected`，按 1x 播，不反复试。
-- **弹题**：`li.ans-videoquiz-opt > label > span.tkRadio > input[type=radio]`，点 radio；提交点是 `DIV.tkTopic_oper`（不是 `a`）；提交后浮层可能不视觉关闭，点 `.ans-videoquiz-continue` 放行播放。不要依赖判定文字，弹题是否计分页面不给。
+- **锁速**：这门课展开倍速菜单只有 `字幕设定/关闭字幕/公网1/公网2/高清`，没有 2x；写 `video.playbackRate=2` 会被播放器改回 1。菜单没有 2x/1.5x/1.25x 时直接记 `rateSource=locked`（预跑 1.2.1 起改用这个值，不再写属性），按 1x 播，不反复试。
+- **弹题**：`li.ans-videoquiz-opt > label > span.tkRadio > input[type=radio]`，点 radio 并回读 checked；提交点用**可见的 `a.ans-videoquiz-submit`**（1.2.1 实测点 `DIV.tkTopic_oper` 不放行、视频不续播）；必要时点 `.ans-videoquiz-continue`。`.spanHas`/`.spanNot` 是静态文案（提交前就能看到「回答正确」），不是判定；弹题是否计分页面不给。
 - **测验答案不要读文字**：待作答态的 DOM 文字是混淆字体（形如 `A 惉悻惆惈成敦就惃惄`），任何按可见文字匹配的选答都会失败。只认 `li[qid]` 的 DOM 顺序 + `span[data]` token：单选是 `A`–`D`，判断是整 token `true`/`false`，多选是字母拼接。核对 `input[name=answer<qid>]` 时按 **token 集合**比较——把 `true` 拆成字符再排序会得到 `ertu`，必然误报 `verify-mismatch`。
 - **OCR**：截图用 `f.locator('body').screenshot()`（frame body，整页高度）。Windows 控制台先 `$env:PYTHONIOENCODING='utf-8'; [Console]::OutputEncoding=[System.Text.Encoding]::UTF8`，否则中文乱码、只剩几行。`quiz_panel.py` 的 x 区间是宽屏页面的启发式；932 px 窄页的题面从 x≈39 开始，`100–1100` 会把题面全过滤掉。验收配方直接打印全部 OCR 行（约 25 行），不进面板过滤。
 - 结果页提交后是明文（我的答案/得分），可复盘；0 分不一定点亮任务点，是否点亮只看目录尾部数字。
+
+## 预跑：证据模式单节点（<运行日期>，1.2.1）
+
+冷启动子 agent，只读 `mcp__browser__`、单标签、最小化，按 `local/private.toml` 的临时 `mode=evidence`（`submit=false`）跑完整节；章节测验只读不提交。
+
+| 项 | 实测 |
+|---|---|
+| 视频 | 498.32 s，1x（菜单无倍速，`locked`），静音，`ended=true` |
+| 弹题 | t=343.26 s；「地球作为太阳系的独立行星形成于（）亿年前」选 D（46）；无判分，`low_confidence` |
+| 字幕 | `allsubtitle` 返回 HTTP 200 + `[]`；本视频**没有字幕轨**，弹题和测验都没有原文可支撑 |
+| 章节测验 | workId 900001，5 题；只读打开、OCR；**0 选项点击 / 0 提交 / 未重开**；`decision=do-not-submit` |
+| 任务点 | 1.2.1 行尾 `2 → 1`；课程总数 240 → 239；剩下 1 是未提交的测验 |
+| 成本 | **37 次调用 / 2.29M token / 722 s**（其中浏览器 21 次） |
+| 审计 | `session_cost.py --audit-submit` = clean；`check_evidence.py --require-readonly` = OK |
+
+37 次里只有 3 次观察器 + 2 次弹题 + 1 次起播是必需动作，其余是**可避免的探索**：
+
+1. 目录帧试探 5 次：`browser_evaluate` 读不到 `mooc2-ans` 帧（`document.domain` 隔离），改用 `browser_run_code_unsafe` 的 `page.frames()`。→ 快速配方第 1 步直接用后者。
+2. 弹题 5 次：先按旧配方点 `DIV.tkTopic_oper`，浮层不动；又探候选、再点 `a.ans-videoquiz-submit` 才放行。→ 配方改成直接点 `a.ans-videoquiz-submit`，一次读题 + 一次「作答+续播」。
+3. 回目录再重进 6 次：视频完先回目录核对，`page.goBack()` 又回不去，改用 `a.subBack`；再进节点开测验。→ 配方固定「视频 → 弹题 → 测验 → 最后回目录一次」。
+4. 冷启动读文档/仓库 11 次：`references/quickstart.md` 就是为了把这部分压到 1–2 次。
+
+**这次预跑证明的**：证据模式可以完整看完一节、弹题可答、测验可只读取证、不提交、平台任务点只掉视频那一项。
+**没有证明的**：打开答题页生成的 `workAnswerId`（本次 900007）是否占用作答次数；弹题是否计分（页面无判定）；无字幕时测验答案的正确性（没有提交）。这些不写成结论。
+
+复测（同日，1.2.2，409.0 s）：用 [单节点快速配方](quickstart.md) 的 6 个代码块，冷启动 **19 次调用 / 0.80M token / 浏览器 7 次 / 任务点 2→1**，`check_evidence --require-readonly` OK、`--audit-submit` clean。
+比 1.2.1 少 18 次调用、少 1.49M token；少掉的正是目录帧试探、弹题按钮试错和回目录重进。剩余 11 次非浏览器调用是读配置/文档、跑校验、写证据和汇报。
 
 ## 本次结论
 

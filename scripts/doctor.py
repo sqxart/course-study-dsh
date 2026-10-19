@@ -29,12 +29,12 @@ def main():
     ocr_modules = ('PIL', 'fontTools', 'rapidocr_onnxruntime', 'onnxruntime')
     resources = {name: (root / name).is_file() for name in (
         'SKILL.md', 'README.md', 'NOTICE', 'references/dsh-runtime.md',
-        'references/chaoxing.md', 'references/course-flow.md',
+        'references/chaoxing.md', 'references/course-flow.md', 'references/quickstart.md',
         'scripts/dsh_probe.py', 'scripts/option_coverage.py', 'scripts/ocr_guard.py',
-        'scripts/toc_status.py', 'scripts/session_cost.py', 'scripts/question_reader.py',
-        'scripts/quiz_ocr.py', 'scripts/subtitle_evidence.py')}
+        'scripts/toc_status.py', 'scripts/session_cost.py', 'scripts/check_evidence.py',
+        'scripts/question_reader.py', 'scripts/quiz_ocr.py', 'scripts/subtitle_evidence.py')}
     result = {
-        'skill': 'course-study-dsh', 'version': '1.0.0',
+        'skill': 'course-study-dsh', 'version': '1.0.1',
         'python': {'path': sys.executable, 'version': sys.version.split()[0]},
         'node': version('node'), 'typst': version('typst'),
         'reader': question_reader.doctor(),

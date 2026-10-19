@@ -1,0 +1,307 @@
+# 单节点快速配方（学习通 mooc2-ans 目录）
+
+这是一节的**最短可执行序列**，为采用 `mooc2-ans/mycourse/stu` 目录 + `.chapter_item` 行 + 锁 1x 播放器准备。
+目标：冷启动也能把浏览器调用压在 8–10 次，而不是边试边找选择器。
+
+先读 `local/private.toml` 决定模式。**证据模式（`mode=evidence` / `submit=false`）下，章节测验只读：不点选项、不点提交、不重开**；
+视频和弹题照常完成，弹题没有原文时按学科知识作答并标 `low-confidence`。
+通道与更长的平台说明见 [DSH 运行说明](dsh-runtime.md)、[学习通](chaoxing.md)；本文件只给可直接粘贴的代码。
+
+## 0. 先决条件
+
+- 浏览器已在课程目录页（`mooc2-ans.chaoxing.com/mooc2-ans/mycourse/stu?...`），已登录，单标签。
+- 只用 `mcp__browser__*`；不要用 `browser_evaluate` 去读 `mooc2-ans` 目录帧——它被 `document.domain` 隔离，读不到。
+  目录和播放器都在 `page.frames()` 里，用 `browser_run_code_unsafe` 的 `page`。
+- 观察器单次 **175 秒**（本机 `toolCallTimeoutMs=300000`），返回 `timeout` 就续一段，不算失败。
+
+## 1. 进节点 + 静音 + 选速 + 起播 + 拿字幕 URL（1 次调用）
+
+把 `SECTION` 改成目标节号。返回的 `subs.srt` 为空就直接记“无字幕”，不要反复找。
+
+```js
+async (page) => {
+  const SECTION = '1.2.1';
+  const toc = page.frames().find(f => f.url().includes('/mooc2-ans/mycourse/studentcourse'));
+  if (!toc) return { ok: false, reason: 'no-toc-frame' };
+  const row = toc.locator('.chapter_item').filter({ hasText: SECTION }).first();
+  if (!(await row.count())) return { ok: false, reason: 'no-row', section: SECTION };
+  const rowText = (await row.innerText()).replace(/\s+/g, ' ').trim();
+  await row.click();
+  await page.waitForURL(/studentstudy/, { timeout: 25000 }).catch(() => null);
+  await page.waitForTimeout(1500);
+  let vf = null;
+  for (let i = 0; i < 30 && !vf; i++) {
+    vf = page.frames().find(f => f.url().includes('ananas/modules/video'));
+    if (!vf) await page.waitForTimeout(500);
+  }
+  if (!vf) return { ok: false, reason: 'no-video-frame', rowText, url: page.url().slice(0, 120) };
+  const v = vf.locator('video').first();
+  await v.waitFor({ timeout: 15000 });
+  let menu = [];
+  const opener = vf.locator('.vjs-playback-rate').first();
+  if (await opener.count()) {
+    await opener.click().catch(() => null);
+    await page.waitForTimeout(400);
+    menu = await vf.locator('span.vjs-menu-item-text').evaluateAll(els => els.map(e => (e.innerText || '').trim()));
+  }
+  let rate = await v.evaluate(e => e.playbackRate);
+  let rateSource = 'locked';
+  const pick = ['2x', '1.5x', '1.25x'].find(x => menu.includes(x));
+  if (pick) {
+    const exact = new RegExp('^' + pick.replace('.', '\\.') + '$');
+    await vf.locator('span.vjs-menu-item-text').filter({ hasText: exact }).first().click().catch(() => null);
+    await page.waitForTimeout(500);
+    rate = await v.evaluate(e => e.playbackRate);
+    rateSource = rate > 1 ? 'menu' : 'menu-failed';
+    if (rateSource === 'menu-failed') {
+      await v.evaluate((r) => { const el = document.querySelector('video'); el.playbackRate = parseFloat(r); }, pick);
+      await page.waitForTimeout(300);
+      rate = await v.evaluate(e => e.playbackRate);
+      rateSource = rate > 1 ? 'property' : 'rejected';
+    }
+  }
+  await v.evaluate(e => { e.muted = true; e.volume = 0; });
+  const big = vf.locator('.vjs-big-play-button').first();
+  if (await big.count() && await big.isVisible().catch(() => false)) await big.click().catch(() => null);
+  await v.evaluate(e => e.play().catch(() => null));
+  let t = 0;
+  for (let i = 0; i < 30; i++) {
+    await page.waitForTimeout(500);
+    t = await v.evaluate(e => e.currentTime);
+    if (t > 0.5) break;
+  }
+  const meta = await v.evaluate(e => ({ duration: e.duration, paused: e.paused, muted: e.muted, t: e.currentTime, src: (e.currentSrc || '').slice(0, 120) }));
+  let subs = { allsubtitle: null, srt: [] };
+  try {
+    subs = await vf.evaluate(async () => {
+      const url = performance.getEntriesByType('resource').map(e => e.name).find(u => u.includes('allsubtitle'));
+      if (!url) return { allsubtitle: null, srt: [] };
+      const list = await (await fetch(url, { credentials: 'include' })).json();
+      const srt = [];
+      const walk = (n) => {
+        if (typeof n === 'string') { if (/^https?:\/\/.*\.srt(\?|$)/i.test(n)) srt.push(n); }
+        else if (n && typeof n === 'object') Object.values(n).forEach(walk);
+      };
+      walk(list);
+      return { allsubtitle: url, srt: [...new Set(srt)] };
+    });
+  } catch (e) { subs = { error: String(e).slice(0, 100) }; }
+  return { ok: true, section: SECTION, rowText, url: page.url().slice(0, 100), menu, rate, rateSource, meta, subs };
+}
+```
+
+> 属性写入后必须读回：读回不是 `pick` 就记 `rejected`，按实际速率播。锁速课程菜单里没有 `2x/1.5x/1.25x` 时不会进入这个分支，`rateSource` 直接是 `locked`。
+
+## 2. 观察器（每次 1 调用，175 秒）
+
+返回 `ended` / `popup` / `paused` / `tip` / `timeout`；`timeout` 直接再发一次，不要加 sleep 轮询。
+
+```js
+async (page) => {
+  const vf = page.frames().find(f => f.url().includes('ananas/modules/video'));
+  if (!vf) return { reason: 'no-video-frame' };
+  return await vf.evaluate(async () => {
+    const BUDGET = 175000;
+    const start = performance.now();
+    const v = document.querySelector('video');
+    if (!v) return { reason: 'no-video' };
+    const vis = (el) => { if (!el) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).display !== 'none'; };
+    while (performance.now() - start < BUDGET) {
+      if (v.ended) return { reason: 'ended', t: v.currentTime, duration: v.duration };
+      if (vis(document.querySelector('.ans-videoquiz'))) return { reason: 'popup', t: v.currentTime, duration: v.duration };
+      if (vis(document.querySelector('a.writeNote_vid_blue'))) return { reason: 'tip', t: v.currentTime, duration: v.duration };
+      if (v.paused) return { reason: 'paused', t: v.currentTime, duration: v.duration };
+      await new Promise(r => setTimeout(r, 2000));
+    }
+    return { reason: 'timeout', t: v.currentTime, duration: v.duration, paused: v.paused, rate: v.playbackRate };
+  });
+}
+```
+
+- `paused` + 页面有 `a.writeNote_vid_blue`：点「知道了」再 `play()`，不要重新进节点。
+- `popup`：进入下面的弹题流程。
+
+## 3. 弹题：先读，再答（2 次调用）
+
+第一次只读题面和选项，带回模型；用字幕 `find`/`gate` 或学科判断决定选项下标（0 起）。
+
+```js
+async (page) => {
+  const vf = page.frames().find(f => f.url().includes('ananas/modules/video'));
+  if (!vf) return { ok: false, reason: 'no-video-frame' };
+  return await vf.evaluate(() => {
+    const vis = (el) => { if (!el) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).display !== 'none'; };
+    const q = document.querySelector('.ans-videoquiz');
+    if (!vis(q)) return { ok: false, reason: 'no-visible-popup' };
+    const lines = (q.innerText || '').replace(/[ \t]+/g, ' ').split('\n').map(s => s.trim()).filter(Boolean);
+    const opts = [...q.querySelectorAll('li.ans-videoquiz-opt')].map((li, i) => ({
+      i, text: (li.innerText || '').replace(/\s+/g, ' ').trim(),
+      checked: (li.querySelector('input[type=radio]') || {}).checked || false
+    }));
+    const v = document.querySelector('video');
+    return { ok: true, lines: lines.slice(0, 12), opts, paused: v.paused, t: v.currentTime };
+  });
+}
+```
+
+第二次：点 `input[type=radio]`、核对 checked、点**可见的 `a.ans-videoquiz-submit`**（不要点 `DIV.tkTopic_oper`，实测不放行），
+必要时点 `.ans-videoquiz-continue`，再起播并直接续一段 175 秒观察。
+
+```js
+async (page) => {
+  const IDX = 3; // 0-based
+  const vf = page.frames().find(f => f.url().includes('ananas/modules/video'));
+  if (!vf) return { ok: false, reason: 'no-video-frame' };
+  const read = await vf.evaluate((idx) => {
+    const q = document.querySelector('.ans-videoquiz');
+    if (!q) return { ok: false, reason: 'no-popup' };
+    const li = [...q.querySelectorAll('li.ans-videoquiz-opt')][idx];
+    if (!li) return { ok: false, reason: 'no-option', idx };
+    const radio = li.querySelector('input[type=radio]');
+    if (radio && !radio.checked) radio.click();
+    return { ok: true, checked: [...q.querySelectorAll('input[type=radio]')].map(r => r.checked) };
+  }, IDX);
+  if (!read.ok) return read;
+  const sub = vf.locator('a.ans-videoquiz-submit').filter({ hasText: '提交' }).first();
+  const subVisible = await sub.isVisible().catch(() => false);
+  if (subVisible) await sub.click().catch(() => null);
+  await page.waitForTimeout(1500);
+  const state = await vf.evaluate(() => {
+    const vis = (el) => { if (!el) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).display !== 'none'; };
+    return { popup: vis(document.querySelector('.ans-videoquiz')), continueVisible: vis(document.querySelector('.ans-videoquiz-continue')) };
+  });
+  if (state.popup && state.continueVisible) await vf.locator('.ans-videoquiz-continue').first().click().catch(() => null);
+  await page.waitForTimeout(800);
+  const v = vf.locator('video').first();
+  await v.evaluate(e => e.play().catch(() => null));
+  const obs = await v.evaluate(async () => {
+    const BUDGET = 175000;
+    const start = performance.now();
+    const el = document.querySelector('video');
+    const vis = (x) => { if (!x) return false; const r = x.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(x).display !== 'none'; };
+    while (performance.now() - start < BUDGET) {
+      if (el.ended) return { reason: 'ended', t: el.currentTime };
+      if (vis(document.querySelector('.ans-videoquiz'))) return { reason: 'popup', t: el.currentTime };
+      if (el.paused) return { reason: 'paused', t: el.currentTime };
+      await new Promise(r => setTimeout(r, 2000));
+    }
+    return { reason: 'timeout', t: el.currentTime, duration: el.duration };
+  });
+  return { ok: true, read, subVisible, state, obs };
+}
+```
+
+- 页面不显示弹题判分；`.spanHas` / `.spanNot` 的静态文案（如「回答正确」）**不是**判定，提交前后都可能存在，不要当成绩。
+- 弹题不改变任务点；任务点只看目录行尾数字。
+
+## 4. 章节测验：证据模式只读（1 次浏览器 + 1 次 OCR）
+
+视频结束后**不要先回目录**。同一个 `studentstudy` 页面点「章节测验」，读完题再一次性回目录；
+否则 `a.subBack` 会替换页面，你得再进一次节点（预跑里多花了 4–6 次调用）。
+
+```js
+async (page) => {
+  const SHOT = 'C:/path/to/repo/runs/<task>/quiz-1.2.1.png'; // 绝对路径，改成本次 run 目录
+  const fr = page.frames().find(f => f.url().includes('studentstudy'));
+  if (!fr) return { ok: false, reason: 'no-studentstudy-frame' };
+  const tab = fr.locator('li#dct2').first();
+  if (await tab.count()) await tab.click().catch(() => null);
+  else {
+    const span = fr.locator('span.spanText').filter({ hasText: '章节测验' }).first();
+    if (await span.count()) await span.click().catch(() => null);
+  }
+  let qf = null;
+  for (let i = 0; i < 20 && !qf; i++) {
+    qf = page.frames().find(f => /mooc-ans\/work\/doHomeWorkNew/.test(f.url()));
+    if (!qf) await page.waitForTimeout(500);
+  }
+  if (!qf) return { ok: false, reason: 'no-quiz-frame', frames: page.frames().map(f => f.url().slice(0, 80)).filter(Boolean) };
+  await qf.locator('body').screenshot({ path: SHOT, timeout: 20000 }).catch(() => null);
+  const meta = await qf.evaluate(() => {
+    const g = (id) => (document.querySelector(id) || {}).value || null;
+    const timu = [...document.querySelectorAll('.TiMu')].map((t, i) => {
+      const lis = [...t.querySelectorAll('li')].filter(li => li.getAttribute('qid'));
+      return {
+        idx: i + 1,
+        qid: lis.length ? lis[0].getAttribute('qid') : null,
+        qtype: lis.length ? lis[0].getAttribute('qtype') : null,
+        data: lis.map(li => { const s = li.querySelector('span[data]'); return s ? s.getAttribute('data') : null; }),
+        labels: lis.map(li => { const l = li.querySelector('label'); return l ? (l.innerText || '').trim() : null; }),
+        raw: (t.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 110)
+      };
+    });
+    return { workId: g('#workId'), workAnswerId: g('#workAnswerId'), timu, bodyH: document.body.scrollHeight, innerW: window.innerWidth };
+  });
+  return { ok: true, shot: SHOT, meta };
+}
+```
+
+- **不点任何 `li[qid]`、不点「提交」**。证据模式只读；是否提交由 `private.toml` 的 `mode`/`submit` 决定，且必须已有授权。
+- 打开答题页会生成 `#workAnswerId`（本次 1.2.1 = 900007）。它不等于提交，也不等于得分；**是否占用作答次数未验证**。只读前先看测验限次说明，打开后不要重开。
+- 截图后跑 OCR（窄页面直接打印全部行）：
+
+```powershell
+$env:PYTHONIOENCODING='utf-8'; [Console]::OutputEncoding=[System.Text.Encoding]::UTF8
+python scripts/quiz_ocr.py runs/<task>/quiz-1.2.1.png --json --out runs/<task>/ocr-1.2.1.json
+```
+
+## 5. 回目录 + 读任务点（1 次调用）
+
+`page.goBack()` 实测回不到目录；用平台自己的 `a.subBack`（它的 href 是本次新生成的目录地址，不是手拼链接）。
+
+```js
+async (page) => {
+  const href = await page.evaluate(() => { const a = document.querySelector('a.subBack'); return a ? a.href : null; });
+  if (!href) return { ok: false, reason: 'no-subBack' };
+  await page.goto(href, { waitUntil: 'domcontentloaded' }).catch(() => null);
+  await page.waitForTimeout(4000);
+  let f = null;
+  for (let i = 0; i < 10 && !f; i++) {
+    f = page.frames().find(x => x.url().includes('/mooc2-ans/mycourse/studentcourse'));
+    if (!f) await page.waitForTimeout(700);
+  }
+  if (!f) return { ok: false, reason: 'no-toc-frame', url: page.url().slice(0, 120) };
+  const rows = await f.locator('.chapter_item').evaluateAll(els => els
+    .map(e => (e.innerText || '').replace(/\s+/g, ' ').trim())
+    .filter(t => /^\d+(\.\d+)*\s/.test(t)));
+  const job = await page.evaluate(() => {
+    const el = document.querySelector('.maskDiv.jobCountDiv');
+    if (!el) return { present: false };
+    const r = el.getBoundingClientRect();
+    return { present: true, w: Math.round(r.width), h: Math.round(r.height) };
+  });
+  return { ok: true, url: page.url().slice(0, 120), rows, job };
+}
+```
+
+`rows` 里目标节的行尾数字就是剩余任务点；要跑 `toc_status.py` 的数字口径，另存一次 aria 快照：
+
+```powershell
+python scripts/toc_status.py runs/<task>/toc-after.yml --prefix 1.2
+```
+
+快照落在 MCP 的输出目录（`%USERPROFILE%\.dsh\profiles\desktop` 之类），先 `Copy-Item` 到本次 `runs/`。
+
+## 6. 先写证据，再汇报
+
+写 `runs/<task>/evidence.json`，至少包含：`mode`、`authorization`、`course`、`section`、`video`（时长/倍率/`rate_source`/`ended`/观察器次数/字幕结论）、
+`popup`（题干/选择/证据）、`quiz`（题数/`submitted`/`decision`/是否点过选项）、`platform`（`toc_before`/`toc_after` 任务点）、`cost`、`deviations`。
+结构见 [状态与交接](state.md) 的 evidence 段；用下面的检查器在返回前过一遍：
+
+```powershell
+python scripts/check_evidence.py runs/<task>/evidence.json --require-readonly
+```
+
+## 预算与偏差
+
+| 动作 | 浏览器/命令调用 |
+|---|---|
+| 进节点 + 起播 + 字幕 | 1 |
+| 观察器 | `ceil(视频秒数 / 175)` |
+| 弹题（有） | 2 |
+| 章节测验只读（打开 + 截图读元数据） | 1 |
+| OCR + 证据检查 | 1–2 |
+| 回目录 + 读任务点 | 1 |
+
+浏览器调用应落在 **8–10 次**；冷启动会话再加读文档/写证据/汇报，总计 **≤20 次**。
+这是目标，不是保证；实际成本还包含读取配置、证据检查、快照核验、写证据和汇报。超预算时先检查重复导航和探索。
