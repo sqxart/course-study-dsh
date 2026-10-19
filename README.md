@@ -90,6 +90,8 @@ pip install -r requirements-ocr.txt   # 可选：本地 OCR 读题；不装也�
 
 浏览器通道**默认没有**：需要 Node/npx，并在 DSH profile 的 `cordis.patch.yml` 加一条 `mcp-browser`（Playwright MCP，独立 profile），重载后登录。配置样例与限制见 [references/dsh-runtime.md](references/dsh-runtime.md) 的「启用受支持的浏览器通道」。没有它只能做离线工作。
 
+另一个机器或另一个人只照 README 验收时，用 [ACCEPTANCE.md](ACCEPTANCE.md) 的 5 步清单（安装 → 探针 → doctor → 一节不提交 → 量成本）。
+
 ## 用法
 
 装好后在 DSH 里把平台、课程、章节和授权说清楚，例如：
