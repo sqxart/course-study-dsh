@@ -47,7 +47,7 @@
   "popup": {"question": "题干", "selected": "D", "evidence_status": "insufficient-evidence", "low_confidence": true},
   "quiz": {
     "work_id": "0", "work_answer_id": null, "question_count": 5,
-    "submitted": false, "decision": "do-not-submit",
+    "submitted": false, "decision": "do-not-submit", "platform_status": "已查看",
     "options_clicked": 0, "submit_clicked": 0, "reopened": false
   },
   "platform": {"toc_before": {"task_points": 2}, "toc_after": {"task_points": 1}},
@@ -58,6 +58,7 @@
 
 - `mode` 是 `evidence` 或 `completion`；`rate_source` 是 `menu` / `property` / `rejected` / `locked`。
 - `quiz.decision` 在证据模式固定写 `do-not-submit`；完成模式提交后写实际结果页读数。
+- `quiz.platform_status` 写平台学习记录里的读数：证据模式打开过是 `已查看`，没打开是 `未查看`；它不是分数，也不能替代任务点。
 - `platform.toc_after.task_points` 只能小于等于 before；没下降写 warning，不能写成“已完成”。
 - `deviations` 写清可复现的偏差（按钮不放行、无字幕、回目录方式），空数组也要有。
 - `cost.tool_calls` 写本次会话 `tool/call` 事件数（含最后一条汇报）；节点动作数 = 这个数减 1。用 `session_cost.py` 核对。

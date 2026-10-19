@@ -105,7 +105,8 @@ python .\scripts\dsh_probe.py --tools tools.json --agents-home <agents home>
 
 - `--agents-home <...\agents>`：agents home，里面是 `skills\course-study-dsh`；
 - `--custom-root <...\skills>`：技能根，里面直接是 `course-study-dsh`；
-- `--require-discovered`：扫不到任何安装副本时 exit 5，适合验收脚本。
+- `--require-discovered`：扫不到任何安装副本时 exit 5；
+- `--require-winner <target>`：`winner` 不是这个安装目录时 exit 5，防止环境变量丢了却找到旧安装。
 
 `--tools` 的相对路径按**当前工作目录**解析；把 `tools.json` 放在当前目录，或写绝对路径。清单就是工具名 JSON 数组，让 Agent 把当前工具列表写成 `["read", "mcp__browser__browser_click", ...]` 即可。单技能不用加 `--name`。
 
@@ -168,7 +169,7 @@ max_calls_per_node = 30   # 建议预算，不是代码门禁；超限写进 evi
 1. **账号风险**：任何自动化播放都可能被平台判定异常。本项目不伪造心跳，但不保证不被风控。
 2. **配置不是内核门禁**：`submit` 与 `mode` 由技能开始时读取，没有代码强制；默认关，打开后责任在使用者。
 3. **实证范围有限**：一个账号、三门课（人工智能与创业智慧 84/84；示例课程10 1.1/1.2；地球历史 6 个小节，其中 1.2.1/1.2.2 只跑到证据模式、未提交测验）。
-4. **证据模式仍会打开答题页**：可能生成作答记录，是否占用次数未验证。不想冒险就在指令里明确“不要打开测验”，或先看该测验的限次说明。
+4. **证据模式仍会打开答题页**：会生成 `#workAnswerId`，平台“学习记录 → 章节测验”里会标成**已查看**（没有分数、不是已完成）；是否占用作答次数仍未验证。不想留下查看记录就在指令里明确“不要打开测验”，或先看该测验的限次说明。
 
 ## 许可证
 

@@ -1,6 +1,6 @@
 # 外部验收清单（5 步）
 
-给另一台机器或另一个人用：只照 [README](README.md) 和本清单，验证 1.0.2 能装、能探、能跑一节，并回报三个数字。
+给另一台机器或另一个人用：只照 [README](README.md) 和本清单，验证 1.0.3 能装、能探、能跑一节，并回报三个数字。
 不要把本机的 `local/`、`runs/`、浏览器 profile 复制过去。
 
 ## 前置
@@ -18,7 +18,7 @@
    powershell -ExecutionPolicy Bypass -File .\install.ps1 -Force
    ```
    默认目标 `%USERPROFILE%\.agents\skills\course-study-dsh`（设了 `DSH_AGENTS_HOME` 则是 `$env:DSH_AGENTS_HOME\skills\course-study-dsh`）。
-   确认 `<target>\local\private.toml` 存在，且 `mode = "evidence"`、`submit = false`；版本看 `<target>\package-manifest.json` 的 `version`（应为 `1.0.2`）或 `doctor.py` 的 `version`；**重启/重载 DSH 会话**让技能目录刷新。
+   确认 `<target>\local\private.toml` 存在，且 `mode = "evidence"`、`submit = false`；版本看 `<target>\package-manifest.json` 的 `version`（应为 `1.0.3`）或 `doctor.py` 的 `version`；**重启/重载 DSH 会话**让技能目录刷新。
    装依赖（至少 zstandard；OCR 可选）：
    ```powershell
    pip install -r requirements.txt
@@ -28,9 +28,9 @@
 
 2. **探针**：回到**源码仓库根目录**（`install.ps1` 所在目录），把当前工具名写成 JSON 数组（例如 `["read", "mcp__browser__browser_click"]`）存成当前目录的 `tools.json`，跑：
    ```powershell
-   python .\scripts\dsh_probe.py --tools tools.json --agents-home <agents home> --require-discovered
+   python .\scripts\dsh_probe.py --tools tools.json --agents-home <agents home> --require-discovered --require-winner <target>
    ```
-   `<agents home>` 是 `%USERPROFILE%\.agents` 或 `$env:DSH_AGENTS_HOME`，**必须和步骤 1 安装时的环境一致**；新 shell 丢了变量会找到 0 份或旧安装。`--tools` 的相对路径按当前工作目录解析。从仓库跑时 `--source` 默认是仓库，`manifest_drift_files` 才是“安装 vs 源码”。期望：
+   `<agents home>` 是 `%USERPROFILE%\.agents` 或 `$env:DSH_AGENTS_HOME`，**必须和步骤 1 安装时的环境一致**；新 shell 丢了变量会找到 0 份或旧安装。`--tools` 的相对路径按当前工作目录解析。从仓库跑时 `--source` 默认是仓库，`manifest_drift_files` 才是“安装 vs 源码”。`--require-winner` 把“`winner` 必须指向本次安装”变成 exit code，不再靠人眼看。期望：
    - `tools.verdict: "candidate"`、exit 0；
    - `copies >= 1`，且 `winner.skill_file` 指向你刚装的 `<target>\SKILL.md`；
    - `source_is_installed_copy: false`、`manifest_drift_files: 0`。
@@ -51,6 +51,7 @@
      返回 `OK`、exit 0；记录里写明 `do-not-submit`/证据不足；
    - 回目录后这一节的任务点**只掉视频那一项**（常见是 `2 → 1`，剩下的 1 是未提交的测验）；若 `2 → 0`，说明测验被提交或平台点亮了它，必须查清，不能当作通过；
    - 没有对章节测验点过选项或提交；打开过就记下 `workAnswerId`，不重开。
+   - 可选核对：课程页“学习记录 → 章节测验详情”里这一节应显示**已查看**、没有分数、不是“已完成”。这个详情页可能新开标签，看完立即关掉；不要点“查看”重开测验。
 
 5. **量成本**：子 agent 的 id 就是 `%USERPROFILE%\.dsh\sessions\<workspace-key>\<agent-id>\session.v4.jsonl.zstd` 的目录名（从 `list_agents` 取）：
    ```powershell

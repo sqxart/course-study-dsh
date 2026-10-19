@@ -281,6 +281,8 @@ def main(argv=None):
                         help='Exit 0 even when no browser channel is available; the report still says blocked')
     parser.add_argument('--require-discovered', action='store_true',
                         help='Exit 5 when no installed copy is found in the scanned roots')
+    parser.add_argument('--require-winner', metavar='SKILL_DIR',
+                        help='Exit 5 unless the winning copy is this skill directory (SKILL.md is appended if needed)')
     args = parser.parse_args(argv)
     try:
         tools = load_tools(args.tools) if args.tools else None
@@ -294,6 +296,13 @@ def main(argv=None):
         print(json.dumps(report if args.full else summary(report), ensure_ascii=False, indent=2))
         if args.require_discovered and not report['discovery']['copies']:
             return EXIT_NOT_DISCOVERED
+        if args.require_winner:
+            expected = Path(args.require_winner).expanduser()
+            if expected.name != 'SKILL.md':
+                expected = expected / 'SKILL.md'
+            winner = report['discovery']['winner']
+            if not winner or Path(winner['skill_file']).resolve() != expected.resolve():
+                return EXIT_NOT_DISCOVERED
         blocked = report['capability']['live_course_work'] == 'blocked'
         if blocked and not args.allow_offline:
             return 1

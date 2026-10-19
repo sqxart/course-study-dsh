@@ -198,6 +198,12 @@ class ProbeTests(unittest.TestCase):
         self.install(self.agents / 'skills')
         self.assertEqual(self.run_main(['--require-discovered']), 0)
 
+    def test_require_winner_checks_the_winning_copy(self):
+        self.install(self.agents / 'skills')
+        good = self.agents / 'skills' / 'course-study-dsh'
+        self.assertEqual(self.run_main(['--require-winner', str(good)]), 0)
+        self.assertEqual(self.run_main(['--require-winner', str(self.base / 'other')]), probe.EXIT_NOT_DISCOVERED)
+
     def test_manifest_drift_is_empty_when_files_match(self):
         target = self.agents / 'skills' / 'course-study-dsh'
         self.write(target / 'SKILL.md', SKILL_TEXT)
