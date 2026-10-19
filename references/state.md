@@ -61,6 +61,7 @@
 - `quiz.decision` 在证据模式固定写 `do-not-submit`；完成模式提交后写实际结果页读数。
 - `quiz.platform_status` 写平台学习记录里的读数：证据模式打开过是 `已查看`，没打开是 `未查看`；它不是分数，也不能替代任务点。
 - `quiz.add_times` / `quiz.limit_work_submit_times` 读答题页隐藏字段。1.2.3 只读打开后 `add_times` 仍是 0、`limit_work_submit_times` 100，没有提交/start 请求：打开本身没有消耗提交次数，但会留下“已查看”。限次=1 的课未单独验证。
+- `check_evidence.py` 会检查这三个字段：证据模式打开过测验（有 `work_answer_id`）却没写 `platform_status` 时给 warning；`platform_status` 只接受 `已查看` / `未查看` / `已完成`；`add_times` 必须是 ≥0 的整数，`limit_work_submit_times` 必须是 ≥1 的整数。
 - `platform.toc_after.task_points` 只能小于等于 before；没下降写 warning，不能写成“已完成”。
 - `deviations` 写清可复现的偏差（按钮不放行、无字幕、回目录方式），空数组也要有。
 - `cost.tool_calls` 写本次会话 `tool/call` 事件数（含最后一条汇报）；节点动作数 = 这个数减 1。用 `session_cost.py` 核对。

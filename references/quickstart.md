@@ -10,7 +10,7 @@
 ## 0. 先决条件
 
 - 浏览器已在课程目录页（`mooc2-ans.chaoxing.com/mooc2-ans/mycourse/stu?...`），已登录，单标签。
-- 只用 `mcp__browser__*`；不要用 `browser_evaluate` 去读 `mooc2-ans` 目录帧——它被 `document.domain` 隔离，读不到。
+- 只用当前账号那条通道（`mcp__browser__*` 或 `mcp__browser2__*`，见 [多账号运行](multi-account.md)），不要跨账号混用；不要用 `browser_evaluate` 去读 `mooc2-ans` 目录帧——它被 `document.domain` 隔离，读不到。
   目录和播放器都在 `page.frames()` 里，用 `browser_run_code_unsafe` 的 `page`。
 - 观察器单次 **175 秒**（本机 `toolCallTimeoutMs=300000`），返回 `timeout` 就续一段，不算失败。
 

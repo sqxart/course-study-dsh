@@ -1,12 +1,20 @@
 # DSH 运行说明（DeepSeek Harness 专用）
 
-基线：<运行日期>，DeepSeek Harness 桌面版 0.2.1-rc.2，profile `desktop`。本文件只写本机实测或当前版本包文档能互相印证的结论，未验证项单独标注。其他 harness（ZCode/Codex）的 bootstrap、CDP 名称、写权限或调用时限不适用于本技能。
+版本基线：DeepSeek Harness 桌面版 0.2.1-rc.2，profile `desktop`。本文件只写本机实测或当前版本包文档能互相印证的结论；历史小节只反映对应版本快照，**不等于当前能力**。其他 harness（ZCode/Codex）的 bootstrap、CDP 名称、写权限或调用时限不适用于本技能。
 
-## 当前状态（<运行日期>，浏览器通道已启用）
+## 当前通道（<运行日期>，1.0.6）
 
-profile `desktop` 的 `cordis.patch.yml` 里已经 `insert` 了一行 `mcp-browser`：Playwright MCP（stdio，`--browser chrome`，独立 `--user-data-dir`，`--output-dir`，`toolCallTimeoutMs: 300000`），工具名形如 `mcp__browser__browser_navigate`，本机 25 个。
+profile `desktop` 的 `cordis.patch.yml` 里有两条独立的 `mcp-client` 行：
 
-下面的「本次工具面（33 项）」与「浏览器能力矩阵（当前：无）」是**接入 MCP 之前的快照**，只作历史边界参考；现在的实际做法以「等待、批量与恢复」「字幕、取证与题面」「窗口与前台」「本次结论」为准。换浏览器只改 `--browser` 与 `--user-data-dir` 两处，并保留同一时刻只有一个 `mcp-browser`。
+| id | serverName | 工具前缀 | `--user-data-dir` | `--output-dir` |
+|---|---|---|---|---|
+| `mcp-browser` | `browser` | `mcp__browser__*` | `~/.dsh/browser/chrome-course` | `~/.dsh/browser/output` |
+| `mcp-browser2` | `browser2` | `mcp__browser2__*` | `~/.dsh/browser/chrome-clean` | `~/.dsh/browser/output2` |
+
+- 两条都是 Playwright MCP（stdio，`--browser chrome`，`toolCallTimeoutMs: 300000`），各 25 个工具；配置形状见下面「启用受支持的浏览器通道」。
+- **一个账号一条通道、一个 profile、一个标签**；同一账号同一时间只有一个执行器。跨账号怎么分、什么时候必须两边都停：见 [多账号运行](multi-account.md)。
+- 增删这两行会重载 MCP 并重启对应浏览器，**登录态不保证保留**；只在节点边界做，重启后先读一次 `i.chaoxing.com` 确认是不是登录页（<运行日期> 实测：`browser2` 在会话间回到 `about:blank`，再导航就落到登录页）。
+- 不要新开与已有行同 id 的条目（会覆盖已有配置）；也不要让两个账号共用一个 `--user-data-dir`。
 
 ## 识别环境与资源根
 
@@ -29,7 +37,11 @@ profile `desktop` 的 `cordis.patch.yml` 里已经 `insert` 了一行 `mcp-brows
 
 若 `agent-instructions` 未启用，跨目录工作前显式读 `AGENTS.md` 和 `local/CURRENT_HANDOFF.md`。
 
-## 本次工具面（33 项，<运行日期>）
+## 历史快照（历史版本，接入 MCP 之前）
+
+下面两节当时还没有浏览器通道，**已经过时**，只用来解释为什么先有一版“只能离线”的说明；当前能力以「当前通道」为准。
+
+## 工具面（历史版本，33 项）
 
 | 能力 | 工具 | 实测限制 |
 |---|---|---|
@@ -40,56 +52,52 @@ profile `desktop` 的 `cordis.patch.yml` 里已经 `insert` 了一行 `mcp-brows
 | 技能 | `skill` | 返回 base directory 与正文；正文改动下次调用即生效，脚本改动要同步安装目录 |
 | 子代理/工作流 | `workflow` `send_message` `list_agents` 等 | 只是并行委派，不提供浏览器 |
 | MCP | 由 `mcp-client` 配置 | 唯一受支持的扩展通道，工具名形如 `mcp__<server>__<tool>`；每次调用默认 60 秒上限 |
-| 浏览器 | 无 | 侧栏浏览器是给人看的界面，没有 Agent 可调用的操作接口 |
+| 浏览器 | `mcp__browser__*` / `mcp__browser2__*` | <运行日期> 当时没有；现在两条 Playwright MCP，见「当前通道」 |
 
 大输出会被截断并给出完整文件路径（本次实测出现 `[output truncated; full output: …]` 与 spill 说明两处提示）；取片段用 `read` 的 offset/limit 或 `grep`。
 
-## 浏览器能力矩阵（历史快照：接入 MCP 之前）
+## 浏览器能力（历史版本）
 
-| 需要的能力 | 当前状态 |
-|---|---|
-| 列出/切换标签、按 URL 取页 | 无 |
-| DOM 快照、按文本或选择器定位 | 无 |
-| 跨帧读取、跨帧点击 | 无 |
-| 控件点击、键盘输入 | 无 |
-| 页面脚本执行（只读或写入） | 均无 |
-| 截图、下载、剪贴板 | 无 |
-| 工具层等待/重试 | 无，只有 shell 和后台 job |
-
-结论：本 harness 当前只能做离线工作——已有题面和字体时的渲染/OCR、验算、材料整理、状态与交接、安装副本核对。
-任何实时页面动作（播放、弹题、提交、读目录任务点）都做不到，也不得声称已完成。
+接入 MCP 之前，标签、快照、跨帧读取、点击、页面脚本、截图和下载全都是“无”，当时只能做离线工作。
+现在这些能力由配置的 Playwright MCP 提供；历史矩阵不再保留，避免被误读成当前限制。
+没有受支持通道时仍按“只做离线工作”处理，不要用下面这些方式补能力。
 
 ## 不要用来“补能力”的方式
 
-- 不连隐藏调试端口。本次实测 `9222-9230` 无监听、系统里没有 Chrome/Edge 浏览器进程；即便以后出现，也不能靠它冒充受支持通道。
+- 不连隐藏调试端口。即便现在有 Chrome 进程，那也是受支持的 MCP 通道启动的，不要把它的调试端口当第二条通道。
 - 不用 shell 自建 Playwright/Selenium/CDP 脚本去操作课程页；不复用 ZCode 的 browser bootstrap，不调用 Codex 的 `tab.capabilities`/CDP 接口。
 - 不用 UI Automation、按键注入或窗口消息伪造点击、焦点与可见性；不改 `document.visibilityState`，不伪造心跳或学习上报。
 - 不把 `web_fetch` 当登录态，不拼接或重放旧签名链接。需要登录时由用户在本机浏览器手动完成：Agent 不读取、不输出、不代填凭据，不清全站 Cookie。
 
 ## 启用受支持的浏览器通道（需要用户动作）
 
-本机已经完成（见「当前状态」）；下面是换机器、换账号目录或重装时的步骤。
+下面是启用通道、换机器、换账号目录或重装时的步骤。
 
 1. 选一个提供浏览器控制的 MCP server（Playwright、Chrome DevTools 一类），用 `npx` 或本地安装启动。
-2. 在 profile 的 `cordis.patch.yml` 里，把新 server 追加进现有 `mcp-client` 行的 `servers:` 数组，不要新开一个同 id 的条目（否则会覆盖原有配置）。先备份文件：
+2. 在 profile 的 `cordis.patch.yml` 里加一条 loader 条目。**这个版本的 `mcp-client` 每个条目只接受一个 server**（`serverName` + `command` 或 `url`），没有 `servers` 数组；多个账号/多个浏览器就写多条 id 不同的条目。先备份文件：
 
 ```yaml
-- id: mcp-client
-  name: "@deepseek-ai/dsh-mcp-client"
-  config:
-    servers:
-      - transport: streamable-http
-        serverName: deepwiki
-        url: https://mcp.deepwiki.com/mcp
-        failOnStartupError: false
-      - transport: stdio            # 新增项，与上面的 server 并列
-        serverName: browser
+- insert:
+    - id: mcp-browser          # 已有条目；新增一条时换 id（例如 mcp-browser2）
+      name: "@deepseek-ai/dsh-mcp-client"
+      config:
+        serverName: browser    # 工具前缀 mcp__browser__ 的来源，[A-Za-z0-9_-]{1,32}
+        transport: stdio
         command: npx
-        args: ['-y', '@playwright/mcp@latest']
+        args:
+          - "-y"
+          - "@playwright/mcp@latest"
+          - "--browser"
+          - "chrome"
+          - "--user-data-dir"
+          - "<profile-dir>"
+          - "--output-dir"
+          - "<output-dir>"
         failOnStartupError: false
+        toolCallTimeoutMs: 300000
 ```
 
-   改完重载或重启 harness，新工具名形如 `mcp__browser__browser_navigate`。stdio 启动失败时读 harness 日志排查，不要反复重装。
+   多账号就照抄一份，只改四处：`id`、`serverName`、`--user-data-dir`、`--output-dir`。不要复用同一个 `id`（后一条会覆盖前一条），也不要让两个账号共用一个 `--user-data-dir`。改完重载或重启 harness，新工具名形如 `mcp__browser__browser_navigate`。stdio 启动失败时读 harness 日志排查，不要反复重装。
 3. 用当前工具清单跑 `python scripts/dsh_probe.py --tools <工具清单.json> --require-discovered --require-winner <安装目录> --out <本次运行目录>/probe.json`。
    退出码 0 且列出候选只表示“有候选通道”；标签、跨帧、点击、页面脚本、截图、下载、登录态仍要逐项实测。`--require-discovered` 失败 exit 5，`--require-winner` 发现别的安装 exit 6。
 4. 首次登录由用户在该浏览器窗口手动完成，之后按 [网课流程](../references/course-flow.md) 与 [学习通](../references/chaoxing.md) 走一个未完成节点。
@@ -109,7 +117,7 @@ profile `desktop` 的 `cordis.patch.yml` 里已经 `insert` 了一行 `mcp-brows
 
 ## 等待、批量与恢复
 
-- 单次预算由 profile 里 `mcp-browser` 行的 `toolCallTimeoutMs` 决定（本机已从 90 秒提到 300 秒）。不要按固定 85 秒轮询：每次轮询都是一整轮模型调用，代价远高于返回的几十字节。
+- 单次预算由 profile 里该账号那条通道行（`mcp-browser` / `mcp-browser2`）的 `toolCallTimeoutMs` 决定（本机已从 90 秒提到 300 秒）。不要按固定 85 秒轮询：每次轮询都是一整轮模型调用，代价远高于返回的几十字节。
 - 视频等待用「事件驱动观察」：一次 `frame.evaluate` 在页面里每 2 秒自检，**只在状态变化时返回**——视频结束、弹题出现、意外暂停或到预算上限。一节 20 分钟的视频通常 1–3 次调用，而不是十几次。
 - 观察只读 DOM 与媒体状态，不写页面全局变量、不改播放进度；只回传 `{reason, t, duration}` 这类短状态，完整记录写本次 `runs/` 目录。
 - 观察预算要比 `toolCallTimeoutMs` 小一档：本机 300 秒上限下**默认 175 秒**（`4 + ceil(视频秒数/175)` 就是按这个算的）；超时返回 `timeout` 就续一段，不算失败。只有确认通道能稳定返回时才把单次调到 270 秒。
@@ -274,7 +282,7 @@ v24 新布局与旧 mooc2 目录不同：旧的 `#cur<chapterId>` 选择器可�
 - **子 agent 契约**：自己把证据写到 `runs/<节点>/evidence.json`（视频时长、实际倍率、弹题题干与引文、workId/workAnswerId、调用数），最终只回传一段紧凑 JSON；不开新标签、不碰别的课程、不提交未授权测验。
 - **观察器必须有界且可续**：单次调用只跑 **175 秒**（本机 300 秒上限下）就带 `timeout` 返回，下一回合再续。**先写证据文件再返回**，即使被中断也能恢复。
 - **合并调用**（一次 evaluate 内完成）：点目录项进节点 → 找 `<video>` 帧 + 静音 + 选速率 + 起播 + 抓 `allsubtitle` → 一次 `pwsh` 落盘字幕 → 观察器。
-- **观察器总预算按速率缩放**：`总预算 ≈ min(剩余秒数 / rate + 60s, 1500s)`，但**单次调用仍只跑 175 秒**。把 `mcp-browser` 的 `toolCallTimeoutMs` 提到 1800s 左右再跑长视频是另一条路——**会让 MCP 重载、登录态可能丢失，只在节点边界做**；默认不用。
+- **观察器总预算按速率缩放**：`总预算 ≈ min(剩余秒数 / rate + 60s, 1500s)`，但**单次调用仍只跑 175 秒**。把该账号通道的 `toolCallTimeoutMs` 提到 1800s 左右再跑长视频是另一条路——**会让 MCP 重载、登录态可能丢失，只在节点边界做**；默认不用。
 - 验收线：**热启动**（已读过文档、已在本课程目录）单节点浏览器调用 8–10 次；冷启动（新会话从零读文档）总调用 ≤ 20、会话 token ≤ 1.5M。实际成本按本次会话和 evidence 测量，不将目标视为保证。
 
 v24 布局下的 4 次调用配方（跨帧不能合并，所以按帧拆）：
@@ -369,9 +377,9 @@ async () => {
 复测（同日，1.2.2，409.0 s）：用 [单节点快速配方](quickstart.md) 的 6 个代码块，冷启动 **19 次调用 / 0.80M token / 浏览器 7 次 / 任务点 2→1**，`check_evidence --require-readonly` OK、`--audit-submit` clean。
 比 1.2.1 少 18 次调用、少 1.49M token；少掉的正是目录帧试探、弹题按钮试错和回目录重进。剩余 11 次非浏览器调用是读配置/文档、跑校验、写证据和汇报。
 
-## 本次结论
+## 实测结论（<运行日期>）
 
-已核实的通道事实：技能发现与安装根；文件系统探针；`pwsh` 实际为 Windows PowerShell 5.1，前台超时转后台 job，大输出截断并给完整路径；`web_fetch` 无登录态。浏览器能力来自本机 profile 里 `insert` 的 Playwright MCP（25 个 `mcp__browser__*`），不是 harness 内置浏览器。
+已核实的通道事实：技能发现与安装根；文件系统探针；`pwsh` 实际为 Windows PowerShell 5.1，前台超时转后台 job，大输出截断并给完整路径；`web_fetch` 无登录态。浏览器能力来自本机 profile 里 `insert` 的 Playwright MCP（<运行日期> 时是一条 `mcp-browser`、25 个工具；<运行日期> 起 `mcp-browser` + `mcp-browser2` 两条），不是 harness 内置浏览器。
 
 已实战通过（<运行日期>，学习通，Chrome 与 Edge 都验证过）：3.2、3.3、3.4、4.2 四个整节点的章节测验首次 100 分；4.1 为 80 分、4.3 为 66.6 分（各有题目因缺少原文支撑答错，按规则未重开、未重交）；目录 14/84→26/84，每一步都用新加载的课程页核对。3.3、4.2、4.3 全程在 Windows 原生最小化（`IsIconic`）下完成，含播放、选项填写、弹题与章节测验提交、刷新保存。
 
@@ -385,7 +393,7 @@ async () => {
 
 <运行日期>收尾：从 N/N 跑到 **N/N**，26 个节点（5.4、5.5、6.1–6.4、7.1–7.4、8.1–8.4、9.1–9.2、10.1–10.2、11.1–11.4、12.1–12.4）全部完成，其中 24 个节点章节测验首答 <成绩>分；5.5 为 83.3（多选题「少选」只得一半分），12.4 为 <成绩>分（「三创」题选了创新/创造/创业，正确答案是创新/创优/创业，已提交不可改）。按节统计：26 段视频共约 6.4 小时、26 次弹题全部答对、26 次章节测验全部提交；目录复核从 N/N 到 N/N，无待完成任务点。调用成本：单节点从最早 42 次压到 13–17 次（宏内合并字幕发现、观察器直接回传题干、提交时回读角标、每题一次 gate）。新增两个降低读题成本的小工具：`quiz_panel.py` 按题区 x 范围过滤整页 OCR（57 行压到约 20 行），`crop_ocr.py` 在题干被漏识时按 OCR 行锚点裁剪题区并 2 倍放大重识别（7.2 Q1 靠它补出题干）。新确认的坑：平台任务点计数有延迟（10.x 后目录少 <成绩>分，11.4 交卷后自补，不要回头重看视频）；「三创」是创新/创优/创业；`browser_run_code_unsafe` 只允许读 `~/.dsh` 下的两个根目录，工作区脚本加载不了。
 
-通道形态区别：本路径是独立浏览器窗口（`--browser chrome` 或 `--browser msedge`，各自独立 `--user-data-dir`），不是 Codex/ZCode 的内置 IAB。因此 Codex 的「面板尺寸变化 / harness 最小化」清单不适用于本路径；最小化按真实 OS 窗口状态验收，尺寸只影响自身布局。只保留一行 `mcp-browser`，同一时间只开一个浏览器，避免并发标签触发平台多终端提醒；换浏览器就改 `--browser` 与 `--user-data-dir` 两处。首次登录后课程列表 iframe 可能返回一次「加载失败」404，重载页面即可恢复。改这一行会让 MCP 重载并关闭浏览器，登录态不保留，所以配置改动集中在节点边界。
+通道形态区别：本路径是独立浏览器窗口（`--browser chrome` 或 `--browser msedge`，各自独立 `--user-data-dir`），不是 Codex/ZCode 的内置 IAB。因此 Codex 的「面板尺寸变化 / harness 最小化」清单不适用于本路径；最小化按真实 OS 窗口状态验收，尺寸只影响自身布局。**一个账号一条通道、一个浏览器、一个标签**：同一账号开两个标签/两个执行器才会触发多终端提醒；不同账号各用一条通道时怎么并发、什么时候两边都停，见 [多账号运行](multi-account.md)。换浏览器就改 `--browser` 与 `--user-data-dir` 两处。首次登录后课程列表 iframe 可能返回一次「加载失败」404，重载页面即可恢复。改这一行会让 MCP 重载并关闭浏览器，登录态不保留，所以配置改动集中在节点边界。
 
 ## 登录态与重载
 
@@ -404,4 +412,4 @@ async () => {
 - 实测最小化下静音 1x 播放速率正常，弹题、选项填写、章节测验提交和刷新核对都可在最小化下完成；元素截图在最小化下仍可读。
 - 不要把"课程标签是否在前台"当成播放前提；若观察到时间推进异常，先回读 `currentTime` 再判断，别急着重新起播。
 
-仍未验证：下载/上传、其他平台、多标签并发稳定性。平台侧曾出现一次多终端登录提醒，避免并发标签。
+仍未验证：下载/上传、其他平台、**同一账号**的多标签并发稳定性、跨账号长节点并发。平台侧曾出现一次多终端登录提醒，同一账号不要开并发标签；跨账号只做过只读冒烟（见 [多账号运行](multi-account.md)）。

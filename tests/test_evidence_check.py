@@ -101,6 +101,39 @@ class EvidenceCheckTest(unittest.TestCase):
         errors, _ = check.validate(value)
         self.assertEqual(errors, [])
 
+    def test_platform_status_is_accepted_without_warning(self):
+        errors, warnings = check.validate(record(quiz__platform_status='已查看'), require_readonly=True)
+        self.assertEqual(errors, [])
+        self.assertFalse(any('platform_status' in item for item in warnings))
+
+    def test_unknown_platform_status_warns(self):
+        _, warnings = check.validate(record(quiz__platform_status='unknown'))
+        self.assertTrue(any('platform_status' in item for item in warnings))
+        _, warnings = check.validate(record(quiz__platform_status=['已查看']))
+        self.assertTrue(any('platform_status' in item for item in warnings))
+
+    def test_opened_quiz_without_platform_status_warns(self):
+        _, warnings = check.validate(record(quiz__work_answer_id='900002'))
+        self.assertTrue(any('platform_status' in item for item in warnings))
+
+    def test_platform_status_not_required_when_quiz_closed(self):
+        _, warnings = check.validate(record())
+        self.assertFalse(any('platform_status' in item for item in warnings))
+
+    def test_add_times_must_be_a_nonnegative_integer(self):
+        errors, _ = check.validate(record(quiz__add_times=-1))
+        self.assertTrue(any('add_times' in item for item in errors))
+        errors, _ = check.validate(record(quiz__add_times=True))
+        self.assertTrue(any('add_times' in item for item in errors))
+        errors, _ = check.validate(record(quiz__add_times=0))
+        self.assertFalse(any('add_times' in item for item in errors))
+
+    def test_limit_must_be_a_positive_integer(self):
+        errors, _ = check.validate(record(quiz__limit_work_submit_times=0))
+        self.assertTrue(any('limit_work_submit_times' in item for item in errors))
+        errors, _ = check.validate(record(quiz__limit_work_submit_times=100))
+        self.assertFalse(any('limit_work_submit_times' in item for item in errors))
+
 
 class EvidenceCliTest(unittest.TestCase):
     def call(self, args):
@@ -146,6 +179,28 @@ class EvidenceCliTest(unittest.TestCase):
         self.assertEqual(report['status'], 'ok')
         self.assertEqual(report['toc'], [2, 1])
         self.assertEqual(report['submitted'], False)
+
+    def test_json_report_reads_platform_fields(self):
+        value = record(quiz__platform_status='已查看', quiz__add_times=0,
+                       quiz__limit_work_submit_times=100)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'evidence.json'
+            path.write_text(json.dumps(value, ensure_ascii=False), encoding='utf-8')
+            code, output = self.call([str(path), '--json'])
+        self.assertEqual(code, 0)
+        report = json.loads(output)
+        self.assertEqual(report['platform_status'], '已查看')
+        self.assertEqual(report['add_times'], 0)
+        self.assertEqual(report['limit_work_submit_times'], 100)
+
+    def test_text_report_shows_platform_status(self):
+        value = record(quiz__platform_status='已查看')
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'evidence.json'
+            path.write_text(json.dumps(value, ensure_ascii=False), encoding='utf-8')
+            code, output = self.call([str(path), '--require-readonly'])
+        self.assertEqual(code, 0)
+        self.assertIn('platform=已查看', output)
 
 
 if __name__ == '__main__':

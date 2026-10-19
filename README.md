@@ -39,6 +39,7 @@
 
 - 1.2.1/1.2.2 的只读测验在平台“学习记录 → 章节测验详情”里显示 **已查看**、无分数、不是“已完成”。
 - <运行日期> 用 1.2.3 做只读实测：打开答题页后 `#addTimes=0`、`#limitWorkSubmitTimes=100`，没有提交/start 请求，任务点仍 2；**打开本身没有消耗提交次数**（至少这门课/这个字段语义）。仍会留下“已查看”痕迹；限次=1 的课未单独验证。
+- 账号 B（独立 profile，browser2）：完成课「示例课程13」1.1 只读打开，SRT 230 条、`gate` supported；倍速菜单在 DOM 里但不可见，属性写 2 读回 2 后还原 1x/暂停/静音。没有打开测验，没有进度变化。
 
 ## 单节点成本与预算
 
@@ -127,7 +128,7 @@ pip install -r requirements.txt       # zstandard：session_cost.py 读会话日
 pip install -r requirements-ocr.txt   # 可选：本地 OCR 读题；不装也能用截图 + 模型读图
 ```
 
-浏览器通道**默认没有**：需要 Node/npx，并在 DSH profile 的 `cordis.patch.yml` 加一条 `mcp-browser`（Playwright MCP，独立 profile），重载后登录。配置样例与限制见 [references/dsh-runtime.md](references/dsh-runtime.md) 的「启用受支持的浏览器通道」。没有它只能做离线工作。
+浏览器通道**默认没有**：需要 Node/npx，并在 DSH profile 的 `cordis.patch.yml` 加一条 `mcp-browser`（Playwright MCP，独立 profile；多账号再加一条 id 不同、`--user-data-dir` 不同的），重载后登录。配置样例与限制见 [references/dsh-runtime.md](references/dsh-runtime.md) 的「启用受支持的浏览器通道」。没有它只能做离线工作。
 
 另一个机器或另一个人只照 README 验收时，用 [ACCEPTANCE.md](ACCEPTANCE.md) 的 5 步清单（安装 → 探针 → doctor → 一节不提交 → 量成本）。
 
@@ -141,6 +142,7 @@ pip install -r requirements-ocr.txt   # 可选：本地 OCR 读题；不装也�
 - 证据模式下章节测验**只读**：打开答题页、截图/OCR、逐题写证据，不点选项、不点提交、不重开。打开答题页会生成 `#workAnswerId`，它不等于提交；已观察到 `addTimes` 仍为 0、没有消耗提交次数的情形，但会在平台留下“已查看”。
 - 想量单个节点的成本，按「单节点成本」里的命令：子 agent 会话 → `session_cost.py`，目录快照 → `toc_status.py`。
 - 没有字幕的课会标 `low_confidence`，不会假装有原文。
+- 两个账号：每个账号一条独立 profile 的 `mcp-browser` 通道，单标签、单执行器；跨账号只做过只读冒烟，规则和停手条件见 [多账号运行](references/multi-account.md)。
 - 单节的固定动作（进节点/起播、175 秒观察器、弹题、测验只读、回目录）有可粘贴代码：[references/quickstart.md](references/quickstart.md)。
 
 ## 配置
@@ -171,7 +173,7 @@ max_calls_per_node = 30   # 建议预算，不是代码门禁；超限写进 evi
 
 1. **账号风险**：任何自动化播放都可能被平台判定异常。本项目不伪造心跳，但不保证不被风控。
 2. **配置不是内核门禁**：`submit` 与 `mode` 由技能开始时读取，没有代码强制；默认关，打开后责任在使用者。
-3. **实证范围有限**：一个账号、三门课（人工智能与创业智慧 84/84；示例课程10 1.1/1.2；地球历史 6 个小节，其中 1.2.1/1.2.2 只跑到证据模式、未提交测验）。
+3. **实证范围有限**：两个账号、四门课（示例账号：人工智能与创业智慧 N/N、示例课程10 N/N、地球历史 6 个小节，其中 1.2.1/1.2.2 只跑到证据模式、未提交测验；示例账号：示例课程13 1.1 只读取字幕和倍速）。
 4. **证据模式仍会打开答题页**：会生成 `#workAnswerId`，平台“学习记录 → 章节测验”里会标成**已查看**（没有分数、不是已完成）。1.2.3 实测 `#addTimes` 仍为 0、没有提交请求、任务点不变，因此打开本身没有消耗提交次数；但“已查看”是可见痕迹，不想留痕就在指令里明确“不要打开测验”。限次=1 的课未单独验证。
 
 ## 许可证

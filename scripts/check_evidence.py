@@ -22,6 +22,7 @@ from pathlib import Path
 SECTION_CODE = re.compile(r'^\d+(?:\.\d+)*$')
 RATE_SOURCES = {'menu', 'property', 'rejected', 'locked'}
 MODES = {'evidence', 'completion'}
+PLATFORM_STATUSES = {'已查看', '未查看', '已完成'}
 EXIT_INVALID = 5
 
 
@@ -97,6 +98,20 @@ def validate(record, require_readonly=False, allow_incomplete=False):
         if submitted:
             errors.append('quiz.submitted: a read-only pass cannot submit')
 
+    quiz = _get(record, 'quiz')
+    if isinstance(quiz, dict):
+        status = quiz.get('platform_status')
+        if status is not None and (not isinstance(status, str) or status not in PLATFORM_STATUSES):
+            warnings.append('quiz.platform_status={0!r}: expected 已查看, 未查看 or 已完成'.format(status))
+        if mode == 'evidence' and status is None and quiz.get('work_answer_id'):
+            warnings.append('quiz.platform_status: record 已查看/未查看 from 学习记录 for an opened quiz')
+        add_times = quiz.get('add_times')
+        if add_times is not None and not (_is_int(add_times) and add_times >= 0):
+            errors.append('quiz.add_times: expected an integer >= 0')
+        limit = quiz.get('limit_work_submit_times')
+        if limit is not None and not (_is_int(limit) and limit >= 1):
+            errors.append('quiz.limit_work_submit_times: expected an integer >= 1')
+
     need('platform.toc_before.task_points', lambda value: _is_int(value) and value >= 0, 'expected an integer >= 0')
     need('platform.toc_after.task_points', lambda value: _is_int(value) and value >= 0, 'expected an integer >= 0')
     before = _get(record, 'platform.toc_before.task_points')
@@ -163,6 +178,9 @@ def main(argv=None):
         'submitted': _get(record, 'quiz.submitted'),
         'toc': [_get(record, 'platform.toc_before.task_points'), _get(record, 'platform.toc_after.task_points')],
         'tool_calls': _get(record, 'cost.tool_calls'),
+        'platform_status': _get(record, 'quiz.platform_status'),
+        'add_times': _get(record, 'quiz.add_times'),
+        'limit_work_submit_times': _get(record, 'quiz.limit_work_submit_times'),
         'errors': errors,
         'warnings': warnings,
     }
@@ -174,8 +192,9 @@ def main(argv=None):
             for item in errors:
                 print('- ' + item)
         else:
-            print('OK {0} mode={1} submitted={2} toc={3}->{4} calls={5}'.format(
-                path, report['mode'], report['submitted'], report['toc'][0], report['toc'][1], report['tool_calls']))
+            print('OK {0} mode={1} submitted={2} toc={3}->{4} calls={5} platform={6}'.format(
+                path, report['mode'], report['submitted'], report['toc'][0], report['toc'][1],
+                report['tool_calls'], report['platform_status'] or '-'))
         for item in warnings:
             print('WARN ' + item)
     return 0 if not errors else EXIT_INVALID

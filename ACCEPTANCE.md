@@ -1,6 +1,6 @@
 # 外部验收清单（5 步）
 
-给另一台机器或另一个人用：只照 [README](README.md) 和本清单，验证 1.0.5 能装、能探、能跑一节，并回报三个数字。
+给另一台机器或另一个人用：只照 [README](README.md) 和本清单，验证 1.0.6 能装、能探、能跑一节，并回报三个数字。
 不要把本机的 `local/`、`runs/`、浏览器 profile 复制过去。
 
 ## 前置
@@ -18,7 +18,7 @@
    powershell -ExecutionPolicy Bypass -File .\install.ps1 -Force
    ```
    默认目标 `%USERPROFILE%\.agents\skills\course-study-dsh`（设了 `DSH_AGENTS_HOME` 则是 `$env:DSH_AGENTS_HOME\skills\course-study-dsh`）。
-   确认 `<target>\local\private.toml` 存在，且 `mode = "evidence"`、`submit = false`；版本看 `<target>\package-manifest.json` 的 `version`（应为 `1.0.5`）或 `doctor.py` 的 `version`；**重启/重载 DSH 会话**让技能目录刷新。
+   确认 `<target>\local\private.toml` 存在，且 `mode = "evidence"`、`submit = false`；版本看 `<target>\package-manifest.json` 的 `version`（应为 `1.0.6`）或 `doctor.py` 的 `version`；**重启/重载 DSH 会话**让技能目录刷新。
    装依赖（至少 zstandard；OCR 可选）：
    ```powershell
    pip install -r requirements.txt
