@@ -49,7 +49,7 @@ class TaskToolsTests(unittest.TestCase):
 
     def test_different_platform_rejected(self):
         other = snapshot([])
-        other['platform'] = 'icourse163'
+        other['platform'] = 'other-platform'
         with self.assertRaises(ValueError):
             tasks.compare(snapshot([]), other)
 

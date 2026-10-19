@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SKILL_NAME = 'course-study-dsh'
 VERSION = '1.0.0'
 PUBLIC = ('SKILL.md', 'README.md', 'NOTICE', 'LICENSE', '.gitignore', 'install.ps1', 'private.toml.example',
-          'references', 'scripts', 'tests')
+          'requirements.txt', 'requirements-ocr.txt', 'references', 'scripts', 'tests')
 LOCAL_METADATA = ('homework-profile.md', 'legacy-paths.json', 'runtime.json')
 
 
@@ -59,6 +59,8 @@ def main(argv=None):
     install = sub.add_parser('install')
     install.add_argument('--target', required=True)
     install.add_argument('--include-local', action='store_true', help='Include only private location/config metadata, never credentials or profiles')
+    install.add_argument('--force', action='store_true',
+                         help='Reinstall over an existing installation: replace managed files, keep local/ data, rewrite the manifest')
     args = parser.parse_args(argv)
     try:
         output = Path(args.out if args.command == 'export' else args.target).expanduser().resolve()
@@ -66,8 +68,11 @@ def main(argv=None):
             raise ValueError('Choose an independent output directory, or a new directory under dist/')
         if args.command == 'install' and output.name != SKILL_NAME:
             raise ValueError('Install target must be a new ' + SKILL_NAME + ' directory')
-        if output.exists() and (not output.is_dir() or any(output.iterdir())):
-            raise ValueError('Refusing to overwrite an existing installation or nonempty output')
+        if output.exists() and not output.is_dir():
+            raise ValueError('Install target exists and is not a directory')
+        nonempty = output.is_dir() and any(output.iterdir())
+        if nonempty and not (args.command == 'install' and args.force):
+            raise ValueError('Refusing to overwrite an existing installation or nonempty output; pass --force to reinstall')
         entries = files()
         denylist = []
         if args.command == 'export':
@@ -84,6 +89,14 @@ def main(argv=None):
                 path = ROOT / 'local' / name
                 if path.is_file():
                     entries.append((path, path.relative_to(ROOT)))
+        old_paths = []
+        old_manifest_path = output / 'package-manifest.json'
+        if nonempty and args.force and old_manifest_path.is_file():
+            try:
+                old_manifest = json.loads(old_manifest_path.read_text(encoding='utf-8-sig'))
+                old_paths = [item.get('path') for item in old_manifest.get('files', []) if isinstance(item, dict)]
+            except (OSError, json.JSONDecodeError):
+                old_paths = []
         output.mkdir(parents=True, exist_ok=True)
         records = []
         for source, relative in entries:
@@ -91,6 +104,21 @@ def main(argv=None):
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
             records.append({'path': relative.as_posix(), 'sha256': hashlib.sha256(target.read_bytes()).hexdigest()})
+        if old_paths:
+            keep = {record['path'] for record in records}
+            for relative in old_paths:
+                if not relative or relative in keep:
+                    continue
+                stale = (output / relative).resolve()
+                if output.resolve() in stale.parents and stale.is_file():
+                    stale.unlink()
+        if args.command == 'install':
+            local_dir = output / 'local'
+            local_dir.mkdir(exist_ok=True)
+            config = local_dir / 'private.toml'
+            example = output / 'private.toml.example'
+            if not config.exists() and example.is_file():
+                shutil.copy2(example, config)
         manifest = {'skill': SKILL_NAME, 'version': VERSION,
                     'kind': args.command, 'includes_private_metadata': args.command == 'install' and args.include_local,
                     'files': records,

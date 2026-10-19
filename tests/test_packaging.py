@@ -74,6 +74,30 @@ class PackagingTests(unittest.TestCase):
         self.assertFalse((output / 'tests' / '.pytest_cache').exists())
         self.assertTrue((output / 'tests' / 'test_sample.py').exists())
 
+    def test_force_reinstall_replaces_files_and_keeps_local_config(self):
+        output = self.base / 'course-study-dsh'
+        output.mkdir()
+        (output / 'SKILL.md').write_text('old', encoding='utf-8')
+        (output / 'local').mkdir()
+        (output / 'local' / 'private.toml').write_text('mode = "completion"\n', encoding='utf-8')
+        (output / 'package-manifest.json').write_text(json.dumps({'files': [{'path': 'stale.md'}]}), encoding='utf-8')
+        (output / 'stale.md').write_text('stale', encoding='utf-8')
+        self.assertEqual(self.call(['install', '--target', str(output), '--force']), 0)
+        self.assertEqual((output / 'SKILL.md').read_text(encoding='utf-8'),
+                         (self.source / 'SKILL.md').read_text(encoding='utf-8'))
+        self.assertEqual((output / 'local' / 'private.toml').read_text(encoding='utf-8'), 'mode = "completion"\n')
+        self.assertFalse((output / 'stale.md').exists())
+
+    def test_install_seeds_private_config_from_example(self):
+        (self.source / 'private.toml.example').write_text('mode = "evidence"\n', encoding='utf-8')
+        output = self.base / 'course-study-dsh'
+        self.assertEqual(self.call(['install', '--target', str(output)]), 0)
+        self.assertEqual((output / 'local' / 'private.toml').read_text(encoding='utf-8'), 'mode = "evidence"\n')
+
+    def test_this_repository_exports_without_privacy_findings(self):
+        # Regression guard: a personal path in any public file blocks the real export.
+        self.assertEqual(package.public_scan(package.files(), []), [])
+
     def test_cannot_target_an_old_skill_name(self):
         output = self.base / 'course-homework'
         self.assertEqual(self.call(['install', '--target', str(output)]), 2)

@@ -63,9 +63,37 @@ def skill_copies(roots, name=SKILL_NAME):
             if candidate.is_file():
                 copies.append({'rank': root['rank'], 'source': root['source'], 'path': root['path'],
                                'kind': kind, 'skill_file': str(candidate),
+                               'root_dir': str(base / name) if kind == 'bundle' else str(base),
                                'sha256': sha256_file(candidate)})
                 break
     return copies
+
+
+def manifest_drift(skill_dir, source_root):
+    """Compare every file listed in an installed package-manifest.json with the source tree."""
+    skill_dir = Path(skill_dir)
+    source_root = Path(source_root)
+    manifest_path = skill_dir / 'package-manifest.json'
+    if not manifest_path.is_file():
+        return [], None
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding='utf-8-sig'))
+    except (OSError, json.JSONDecodeError):
+        return [{'kind': 'manifest-unreadable', 'path': 'package-manifest.json'}], None
+    items = []
+    for entry in manifest.get('files', []):
+        relative = entry.get('path') if isinstance(entry, dict) else None
+        if not isinstance(relative, str) or not relative:
+            continue
+        source = source_root / relative
+        installed = skill_dir / relative
+        if not source.is_file():
+            items.append({'kind': 'missing-in-source', 'path': relative})
+        elif not installed.is_file():
+            items.append({'kind': 'missing-in-install', 'path': relative})
+        elif sha256_file(source) != sha256_file(installed):
+            items.append({'kind': 'hash-mismatch', 'path': relative})
+    return items, manifest.get('version')
 
 
 def source_skill(source_root=None, name=SKILL_NAME):
@@ -123,10 +151,26 @@ def build_report(cwd=None, name=SKILL_NAME, tools=None, source_root=None,
     drift = [{'source': copy['source'], 'rank': copy['rank'], 'skill_file': copy['skill_file'],
               'sha256': copy['sha256'], 'matches_source': copy.get('sha256') == source.get('sha256')}
              for copy in copies if copy.get('sha256') != source.get('sha256')]
+    manifest_items = []
+    for copy in copies:
+        if copy['kind'] != 'bundle':
+            continue
+        items, version = manifest_drift(copy['root_dir'], source['source_root'])
+        copy['manifest'] = {'version': version, 'drift': len(items)}
+        for item in items:
+            kind = item['kind'] if item['kind'].startswith('manifest-') else 'manifest-' + item['kind']
+            manifest_items.append({'source': copy['source'], 'rank': copy['rank'],
+                                   'skill_file': copy['skill_file'], 'kind': kind,
+                                   'path': item['path']})
     if tools is None:
         surface = {'provided': False, 'count': None, 'names': [], 'browser_candidates': [],
                    'verdict': 'unknown',
                    'reason': 'No tool list was supplied; absence of a browser tool was not observed.'}
+        browser_channel, live_course_work = 'unknown', 'unknown'
+        delivery = ('Discovery only: no tool list was supplied, so live course work is unknown rather '
+                    'than blocked. Re-run with --tools <file> to decide the browser surface.')
+        next_step = ('No tool list was supplied: this run proves filesystem discovery only. Re-run with '
+                     '--tools <file> (or --tools - for stdin) to check the browser surface.')
     else:
         names = tools if isinstance(tools, list) else tool_names(tools)
         hits = browser_candidates(names)
@@ -134,28 +178,33 @@ def build_report(cwd=None, name=SKILL_NAME, tools=None, source_root=None,
                    'verdict': 'candidate' if hits else 'none',
                    'reason': ('A browser-shaped tool name was found; still unverified.'
                               if hits else 'The supplied tool list exposes no browser-shaped tool.')}
-    blocked = surface['verdict'] != 'candidate'
+        if hits:
+            browser_channel, live_course_work = 'candidate', 'needs-verification'
+            delivery = ('Use the candidate channel exactly as the current tool documentation describes; '
+                        'verify identity, then one node.')
+            next_step = 'Verify tabs, cross-frame reads, control clicks, page-script write, screenshots and downloads.'
+        else:
+            browser_channel, live_course_work = 'none', 'blocked'
+            delivery = ('Do not drive a browser from the shell, a hidden debug port or another harness. '
+                        'Enable a supported channel, then re-run this probe.')
+            next_step = ('Enable a supported browser channel (for example an MCP server), re-run with the '
+                         'current tool list, then verify one unfinished node.')
     report = {
         'schema_version': 1, 'skill': name, 'harness': 'deepseek-harness',
         'probe': {'network_used': False, 'browser_opened': False, 'environment_changed': False},
         'cwd': str(Path(cwd or os.getcwd())),
         'discovery': {'scope': 'filesystem-roots-only', 'caveat': CAVEAT, 'roots': roots,
                       'copies': copies, 'winner': winner, 'drift': drift,
-                      'source': source},
+                      'manifest_drift': manifest_items, 'source': source},
         'tools': surface,
         'capability': {
-            'browser_channel': 'candidate' if not blocked else 'none',
+            'browser_channel': browser_channel,
             'verified': False,
-            'live_course_work': 'needs-verification' if not blocked else 'blocked',
+            'live_course_work': live_course_work,
             'offline_work': 'available',
-            'delivery': ('Use the candidate channel exactly as the current tool documentation '
-                         'describes; verify identity, then one node.') if not blocked else
-                        ('Do not drive a browser from the shell, a hidden debug port or another '
-                         'harness. Enable a supported channel, then re-run this probe.'),
+            'delivery': delivery,
         },
-        'next': ('Enable a supported browser channel (for example an MCP server), re-run with the '
-                 'current tool list, then verify one unfinished node.') if blocked else
-                'Verify tabs, cross-frame reads, control clicks, page-script write, screenshots and downloads.',
+        'next': next_step,
     }
     return report
 
@@ -170,7 +219,9 @@ def summary(report):
         'source_skill': discovery['source']['skill_file'],
         'winner': None if winner is None else {'source': winner['source'], 'rank': winner['rank'],
                                                'skill_file': winner['skill_file']},
-        'drift': [item['source'] for item in discovery['drift']],
+        'drift': sorted({item['source'] for item in discovery['drift']} |
+                        {item['source'] for item in discovery.get('manifest_drift', [])}),
+        'manifest_drift_files': len(discovery.get('manifest_drift', [])),
         'copies': len(discovery['copies']),
         'tools': {'provided': report['tools']['provided'], 'count': report['tools']['count'],
                   'verdict': report['tools']['verdict'],

@@ -1,0 +1,7 @@
+# Optional OCR stack for reading quiz screenshots locally (scripts/quiz_ocr.py
+# and scripts/question_reader.py). Without it, use the model's image reading on
+# the saved screenshot instead; nothing else in the skill needs these.
+Pillow>=10
+fonttools>=4
+rapidocr-onnxruntime>=1.3
+onnxruntime>=1.16

@@ -1,5 +1,12 @@
 # Copy this file to local/private.toml and edit. local/ is gitignored.
-# The skill reads it before starting a node; missing file means the public defaults.
+# The installer seeds local/private.toml from this file; a missing file means
+# the public default: mode = "evidence", submit = false.
+#
+# mode = "evidence"    only submit answers backed by subtitle/original text;
+#                      a missing citation stops before submission.
+# mode = "completion"  allow subject-knowledge inference, submit it and record
+#                      low_confidence = true. Private use only.
+mode = "evidence"
 
 [playback]
 # 0 = use the highest rate the platform's own player menu offers.

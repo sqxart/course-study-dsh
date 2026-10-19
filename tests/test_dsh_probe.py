@@ -107,8 +107,8 @@ class ProbeTests(unittest.TestCase):
         capability = self.report()['capability']
         self.assertEqual(self.report()['tools']['verdict'], 'unknown')
         self.assertFalse(self.report()['tools']['provided'])
-        self.assertEqual(capability['browser_channel'], 'none')
-        self.assertEqual(capability['live_course_work'], 'blocked')
+        self.assertEqual(capability['browser_channel'], 'unknown')
+        self.assertEqual(capability['live_course_work'], 'unknown')
 
     def test_plain_tool_list_has_no_browser_channel(self):
         result = self.report(tools=['read', 'write', 'pwsh', 'web_fetch'])
@@ -143,12 +143,43 @@ class ProbeTests(unittest.TestCase):
         self.assertFalse(flags['browser_opened'])
         self.assertFalse(flags['environment_changed'])
 
-    def test_main_exits_zero_only_with_a_browser_candidate(self):
+    def test_main_exit_codes(self):
         plain = self.tool_file(['read', 'pwsh'], 'plain.json')
         browser = self.tool_file(['mcp__playwright__browser_click'], 'browser.json')
+        self.assertEqual(self.run_main([]), 0)
         self.assertEqual(self.run_main(['--tools', str(plain)]), 1)
         self.assertEqual(self.run_main(['--tools', str(browser)]), 0)
         self.assertEqual(self.run_main(['--tools', str(plain), '--allow-offline']), 0)
+
+    def test_manifest_drift_finds_hash_and_missing_files(self):
+        target = self.agents / 'skills' / 'course-study-dsh'
+        self.write(target / 'SKILL.md', SKILL_TEXT)
+        self.write(self.source / 'scripts' / 'same.py', 'print(1)\n')
+        self.write(target / 'scripts' / 'same.py', 'print(2)\n')
+        self.write(self.source / 'scripts' / 'gone.py', 'print(3)\n')
+        manifest = {'version': '1.0.0', 'files': [
+            {'path': 'SKILL.md', 'sha256': 'ignored'},
+            {'path': 'scripts/same.py', 'sha256': 'ignored'},
+            {'path': 'scripts/gone.py', 'sha256': 'ignored'},
+        ]}
+        self.write(target / 'package-manifest.json', json.dumps(manifest))
+        result = self.report()
+        kinds = {(item['kind'], item['path']) for item in result['discovery']['manifest_drift']}
+        self.assertIn(('manifest-hash-mismatch', 'scripts/same.py'), kinds)
+        self.assertIn(('manifest-missing-in-install', 'scripts/gone.py'), kinds)
+        self.assertIn('user-agents', probe.summary(result)['drift'])
+        self.assertEqual(probe.summary(result)['manifest_drift_files'], 2)
+
+    def test_manifest_drift_is_empty_when_files_match(self):
+        target = self.agents / 'skills' / 'course-study-dsh'
+        self.write(target / 'SKILL.md', SKILL_TEXT)
+        self.write(self.source / 'scripts' / 'same.py', 'print(1)\n')
+        self.write(target / 'scripts' / 'same.py', 'print(1)\n')
+        manifest = {'version': '1.0.0', 'files': [{'path': 'scripts/same.py'}]}
+        self.write(target / 'package-manifest.json', json.dumps(manifest))
+        result = self.report()
+        self.assertEqual(result['discovery']['manifest_drift'], [])
+        self.assertEqual(probe.summary(result)['drift'], [])
 
     def test_bad_tool_file_returns_two(self):
         bad = self.base / 'bad.json'
@@ -158,7 +189,7 @@ class ProbeTests(unittest.TestCase):
     def test_out_file_holds_the_full_report_without_leftovers(self):
         out = self.base / 'records' / 'probe.json'
         self.install(self.agents / 'skills', SKILL_TEXT + 'edited\n')
-        self.assertEqual(self.run_main(['--out', str(out)]), 1)
+        self.assertEqual(self.run_main(['--out', str(out)]), 0)
         data = json.loads(out.read_text(encoding='utf-8'))
         self.assertEqual(data['schema_version'], 1)
         self.assertEqual(data['discovery']['winner']['source'], 'user-agents')
@@ -170,7 +201,7 @@ class ProbeTests(unittest.TestCase):
         self.write(out, 'keep me')
         self.assertEqual(self.run_main(['--out', str(out)]), 2)
         self.assertEqual(out.read_text(encoding='utf-8'), 'keep me')
-        self.assertEqual(self.run_main(['--out', str(out), '--force']), 1)
+        self.assertEqual(self.run_main(['--out', str(out), '--force']), 0)
         self.assertNotEqual(out.read_text(encoding='utf-8'), 'keep me')
         self.assertFalse(list(out.parent.glob('*.tmp')))
 

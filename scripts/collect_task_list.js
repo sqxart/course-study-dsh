@@ -5,8 +5,7 @@
   const scope = opts.scope || {};
   const view = scope.view || 'homework';
   const text = element => String(element && (element.innerText || element.textContent) || '').trim().replace(/\s+/g, ' ');
-  const selectors = opts.item_selector ? [opts.item_selector] : platform === 'icourse163'
-    ? [view === 'content' ? '.sourceList .lsicon' : '.u-quizHwListItem']
+  const selectors = opts.item_selector ? [opts.item_selector]
     : view === 'content' ? ['.catalog_title[role="link"]', '.posCatalog_select', '.chapter_item']
       : ['li[onclick*="goTask"]'];
   let nodes = [];

@@ -1,0 +1,3 @@
+# Core runtime dependency for the cost report (scripts/session_cost.py).
+# The rest of the skill runs on the Python standard library.
+zstandard>=0.22

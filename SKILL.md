@@ -1,6 +1,6 @@
 ---
 name: course-study-dsh
-description: DeepSeek Harness 专用的网课减负技能。静音、按平台官方菜单允许的速率把学习通/中国大学MOOC 的视频看完，用字幕原话回答弹题，章节测验先取证再按授权提交；证据不足就拒答。只在当前 harness 的 mcp-browser 通道下操作页面。
+description: DeepSeek Harness 专用的网课减负技能。静音、按平台官方菜单允许的速率把学习通课程的视频看完，用字幕原话回答弹题，章节测验先取证再按授权提交；证据不足就拒答。只在当前 harness 的 mcp-browser 通道下操作页面。
 ---
 
 # 课程助手（DeepSeek Harness 版）
@@ -11,12 +11,12 @@ Harness 的通道事实、已实测范围与调用预算在 [DSH 运行说明](r
 ## 开始
 
 1. 确认当前工具面：`mcp__browser__browser_*`、`pwsh`、`read/edit`。缺少受支持的浏览器通道时只做离线工作，不去找隐藏调试接口或自建 CDP 脚本。
-2. 确定平台、课程、账号别名、任务类型与已有授权。续跑先读 `local/CURRENT_HANDOFF.md` 与 `local/active-session.json`，再核验平台实际状态。
+2. 先读 `local/private.toml`：没有文件就按证据模式（`mode=evidence`、`submit=false`）；有则按其 `mode` 与 `submit` 执行，并在记录里写明本次模式。然后确定平台、课程、账号别名、任务类型与已有授权；续跑先读 `local/CURRENT_HANDOFF.md` 与 `local/active-session.json`，再核验平台实际状态。
 3. 按任务只读所需材料：
 
    | 任务 | 流程 | 平台知识 |
    |---|---|---|
-   | 看课、续跑、弹题、章节测验 | [网课流程](references/course-flow.md) | [学习通](references/chaoxing.md) / [中国大学MOOC](references/icourse163.md) |
+   | 看课、续跑、弹题、章节测验 | [网课流程](references/course-flow.md) | [学习通](references/chaoxing.md) |
    | 摸不清的现象、报错、旧坑 | [现场笔记](references/field-notes.md) | 先查这里再动手 |
    | 有无新课件/测验、截止时间 | 网课流程的列表巡检 | 先停在列表；开始测验是后续独立动作 |
 
