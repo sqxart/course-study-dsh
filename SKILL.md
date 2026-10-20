@@ -10,7 +10,7 @@ Harness 的通道事实、已实测范围与调用预算在 [DSH 运行说明](r
 
 ## 开始
 
-1. 确认当前工具面：当前账号对应的 `mcp__browser__browser_*` 或 `mcp__browser2__browser_*`、`pwsh`、`read/edit`。缺少受支持的浏览器通道时只做离线工作，不去找隐藏调试接口或自建 CDP 脚本。
+1. 确认当前工具面：当前账号对应的 `mcp__browser__browser_*`、`mcp__browser2__browser_*` 或 `mcp__browser3__browser_*`（一个账号只用一条）、`pwsh`、`read/edit`。缺少受支持的浏览器通道时只做离线工作，不去找隐藏调试接口或自建 CDP 脚本。
 2. 先读 `local/private.toml`：没有文件就按证据模式（`mode=evidence`、`submit=false`）；有则按其 `mode` 与 `submit` 执行，并在记录里写明本次模式。然后确定平台、课程、账号别名、任务类型与已有授权；续跑先读 `local/CURRENT_HANDOFF.md` 与 `local/active-session.json`，再核验平台实际状态。
    **证据模式**下章节测验只读：打开答题页、截图/OCR、摆证据，**不点选项、不点提交、不重开**；视频和弹题照常完成。打开答题页会生成 `#workAnswerId`，平台学习记录里会标成**已查看**（无分数、不是已完成）；1.2.3 实测 `#addTimes` 仍为 0、没有消耗提交次数，但“已查看”是可见痕迹。用户明确不想留下查看记录时，停在目录并报告“测验未打开”，不要自行打开。
 3. 按任务只读所需材料：

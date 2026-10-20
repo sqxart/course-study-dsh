@@ -2,19 +2,20 @@
 
 版本基线：DeepSeek Harness 桌面版 0.2.1-rc.2，profile `desktop`。本文件只写本机实测或当前版本包文档能互相印证的结论；历史小节只反映对应版本快照，**不等于当前能力**。其他 harness（ZCode/Codex）的 bootstrap、CDP 名称、写权限或调用时限不适用于本技能。
 
-## 当前通道（<运行日期>，1.0.8）
+## 当前通道（<运行日期>，1.0.9）
 
-profile `desktop` 的 `cordis.patch.yml` 里有两条独立的 `mcp-client` 行：
+浏览器由 profile 的 `cordis.patch.yml` 中的 Playwright MCP 提供。下面是多通道配置形状，实际启用、登录和退役状态从本地配置读取；退役条目不再调用。
 
 | id | serverName | 工具前缀 | `--user-data-dir` | `--output-dir` |
 |---|---|---|---|---|
-| `mcp-browser` | `browser` | `mcp__browser__*` | `~/.dsh/browser/chrome-course` | `~/.dsh/browser/output` |
-| `mcp-browser2` | `browser2` | `mcp__browser2__*` | `~/.dsh/browser/chrome-clean` | `~/.dsh/browser/output2` |
+| `mcp-browser` | `browser` | `mcp__browser__*` | `~/.dsh/browser/profile-1` | `~/.dsh/browser/output-1` |
+| `mcp-browser2` | `browser2` | `mcp__browser2__*` | `~/.dsh/browser/profile-2` | `~/.dsh/browser/output-2` |
+| `mcp-browser3` | `browser3` | `mcp__browser3__*` | `~/.dsh/browser/profile-3` | `~/.dsh/browser/output-3` |
 
-- 两条都是 Playwright MCP（stdio，`--browser chrome`，`toolCallTimeoutMs: 300000`），各 25 个工具；配置形状见下面「启用受支持的浏览器通道」。
-- **一个账号一条通道、一个 profile、一个标签**；同一账号同一时间只有一个执行器。跨账号怎么分、什么时候必须两边都停：见 [多账号运行](multi-account.md)。
-- 增删这两行会重载 MCP 并重启对应浏览器，**登录态不保证保留**；只在节点边界做，重启后先读一次 `i.chaoxing.com` 确认是不是登录页（<运行日期> 实测：`browser2` 在会话间回到 `about:blank`，再导航就落到登录页）。
-- 不要新开与已有行同 id 的条目（会覆盖已有配置）；也不要让两个账号共用一个 `--user-data-dir`。
+- Playwright MCP 使用 stdio、`--browser chrome` 和独立目录；配置形状见「启用受支持的浏览器通道」。
+- **一个账号一条通道、一个 profile、一个标签**；同一账号同一时间只有一个执行器。分配与停止条件见 [多账号运行](multi-account.md)。
+- 增删条目会重载 MCP 并重启对应浏览器，登录态不保证保留；只在节点边界改动，之后核对当前工具清单与登录页。
+- 同 id 会覆盖已有配置；不同账号不能共用 `--user-data-dir`。
 
 ## 识别环境与资源根
 
@@ -52,7 +53,7 @@ profile `desktop` 的 `cordis.patch.yml` 里有两条独立的 `mcp-client` 行�
 | 技能 | `skill` | 返回 base directory 与正文；正文改动下次调用即生效，脚本改动要同步安装目录 |
 | 子代理/工作流 | `workflow` `send_message` `list_agents` 等 | 只是并行委派，不提供浏览器 |
 | MCP | 由 `mcp-client` 配置 | 唯一受支持的扩展通道，工具名形如 `mcp__<server>__<tool>`；每次调用默认 60 秒上限 |
-| 浏览器 | `mcp__browser__*` / `mcp__browser2__*` | <运行日期> 当时没有；现在两条 Playwright MCP，见「当前通道」 |
+| 浏览器 | `mcp__browser__*` / `mcp__browser3__*` | 历史版本 当时没有；现由配置的 Playwright MCP 提供，见「当前通道」 |
 
 大输出会被截断并给出完整文件路径（本次实测出现 `[output truncated; full output: …]` 与 spill 说明两处提示）；取片段用 `read` 的 offset/limit 或 `grep`。
 
@@ -117,7 +118,7 @@ profile `desktop` 的 `cordis.patch.yml` 里有两条独立的 `mcp-client` 行�
 
 ## 等待、批量与恢复
 
-- 单次预算由 profile 里该账号那条通道行（`mcp-browser` / `mcp-browser2`）的 `toolCallTimeoutMs` 决定（本机已从 90 秒提到 300 秒）。不要按固定 85 秒轮询：每次轮询都是一整轮模型调用，代价远高于返回的几十字节。
+- 单次预算由 profile 里该账号那条通道行的 `toolCallTimeoutMs` 决定（本机已从 90 秒提到 300 秒）。不要按固定 85 秒轮询：每次轮询都是一整轮模型调用，代价远高于返回的几十字节。
 - 视频等待用「事件驱动观察」：一次 `frame.evaluate` 在页面里每 2 秒自检，**只在状态变化时返回**——视频结束、弹题出现、意外暂停或到预算上限。一节 20 分钟的视频通常 1–3 次调用，而不是十几次。
 - 观察只读 DOM 与媒体状态，不写页面全局变量、不改播放进度；只回传 `{reason, t, duration}` 这类短状态，完整记录写本次 `runs/` 目录。
 - 观察预算要比 `toolCallTimeoutMs` 小一档：本机 300 秒上限下**默认 175 秒**（`4 + ceil(视频秒数/175)` 就是按这个算的）；超时返回 `timeout` 就续一段，不算失败。只有确认通道能稳定返回时才把单次调到 270 秒。
@@ -148,6 +149,8 @@ const state = await videoFrame.evaluate(async () => {
 - `browser_evaluate` 只把函数体交给 `page.evaluate`，**不会传参数**；写成 `async (maxMs) =>` 时 `maxMs` 是 `undefined`，循环一次都不跑、立刻返回 `timeout`（5.3 首次观察器就这样白跑一次）。预算写成函数内常量。
 - 播放到约 1 分半会弹「可边看边记」笔记提示（`a.writeNote_vid_blue`「知道了」），它常与暂停同时出现；点掉提示后再 `v.play()`。观察器返回 `paused` 时带 `tip:true`，不要把它当成平台考勤而重复起播。
 - 进入章节测验时可能弹「当前章节还有任务点未完成」；页面内更可信的任务点指示是左栏 `span.jobUnfinishCount` 角标（5.3 视频完成后 2→1），别把这个暂态弹窗当成视频没保存。
+- **日上限元素在 `studentstudy` 帧内**：`.maskDiv.jobCountDiv` 不在顶层页、也不在目录帧；只查顶层会得到 `present:false` 的假阴性。判定仍只看帧内 `getBoundingClientRect()` 的宽高是否 >0。
+- **2x 不保证计入任务点**：以当前课程规则与回读任务点为准。先区分剩余点是视频还是测验，再判断倍率是否影响计入；必要时按官方 1x 复核，不凭 `ended` 下结论。
 - `browser_take_screenshot` 的 `filename` 落在 MCP server 的 CWD（本次 `%USERPROFILE%\.dsh\profiles\desktop\`），既不是 `--output-dir` 也不是工作区；每次 `Copy-Item` 到本次 `runs/`。
 - `subtitle_evidence.py find` 的多个 `--query` 是 **AND**（同一 cue 必须同时含全部词），不是 OR；查缺口要逐词单独跑，否则会误报 `NO_MATCH`。
 
@@ -275,6 +278,7 @@ v24 新布局与旧 mooc2 目录不同：旧的 `#cur<chapterId>` 选择器可�
 - **链接末尾的数字是未完成任务点数**：看完后消失。这是最便宜的完成证据——不用 OCR，也不用等「已完成任务点」。
 - 点条目 → `mooc1.chaoxing.com/mycourse/studentstudy?chapterId=...`；视频在 `mooc1.chaoxing.com/ananas/modules/video/index.html` 的嵌套帧里，帧内 `performance` 仍是取字幕的位置。
 - 倍速菜单是 `span.vjs-menu-item-text`，选项 `2x / 1.5x / 1.25x / 1x`。**优先点菜单项**（官方动作）；菜单点不动才退回 `video.playbackRate = 2`，并在记录里注明"属性写入"而不是"菜单选择"。
+- **最小化窗口下控制条是 0×0**：`.vjs-playback-rate` 与菜单项的 `getBoundingClientRect()` 都为 0，`locator.click`/物理点击不可用。对官方菜单项 `span.vjs-menu-item-text`（2x）派发 DOM `click`，读回 `playbackRate=2`，记为 `rate_source=menu`，并在 evidence 的 `deviations` 写明“DOM click，不是物理点击”。能拿到菜单项时，这比退回属性写入更接近官方动作。
 - **属性写入会被播放器覆盖**：实测把 `playbackRate` 设成 1、读回来仍是 2——播放器按自己的菜单状态重设。所以设置后必须**读回校验**；读回不一致就记 `menu-failed`，不要声称已改速率。
 - **弹题提交后可能没有判定**：v24 播放器里点提交，弹窗直接消失，`.spanHas` / `.spanNot` / `#videoquiz-continue` 全部不可见，`#rightNum` 为 null；任务点数也不变。**提交成功 ≠ 计入**，唯一可信的验收是回目录看尾部任务点数。
 - **剩下的任务点通常是章节测验，不是弹题**：小节页顶部任务栏分「视频 / 章节测验」，写着「任务点已完成」说明视频那一项已经算完；任务点数还挂着 1 时，要补的是测验。
@@ -387,7 +391,7 @@ async () => {
 
 ## 实测结论（<运行日期>）
 
-已核实的通道事实：技能发现与安装根；文件系统探针；`pwsh` 实际为 Windows PowerShell 5.1，前台超时转后台 job，大输出截断并给完整路径；`web_fetch` 无登录态。浏览器能力来自本机 profile 里 `insert` 的 Playwright MCP（<运行日期> 时是一条 `mcp-browser`、25 个工具；<运行日期> 起 `mcp-browser` + `mcp-browser2` 两条），不是 harness 内置浏览器。
+已核实的通道事实：技能发现与安装根；文件系统探针；`pwsh` 实际为 Windows PowerShell 5.1，前台超时转后台 job，大输出截断并给完整路径；`web_fetch` 无登录态。浏览器能力来自本机 profile 里 `insert` 的 Playwright MCP（<运行日期> 时是一条 `mcp-browser`、25 个工具；<运行日期> 起 `mcp-browser` + `mcp-browser2`；<运行日期> 起第三条 `mcp-browser3` 用于 account-c，`mcp-browser2` 退役），不是 harness 内置浏览器。
 
 已实战通过（<运行日期>，学习通，Chrome 与 Edge 都验证过）：3.2、3.3、3.4、4.2 四个整节点的章节测验首次 100 分；4.1 为 80 分、4.3 为 66.6 分（各有题目因缺少原文支撑答错，按规则未重开、未重交）；目录 14/84→26/84，每一步都用新加载的课程页核对。3.3、4.2、4.3 全程在 Windows 原生最小化（`IsIconic`）下完成，含播放、选项填写、弹题与章节测验提交、刷新保存。
 

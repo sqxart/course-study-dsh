@@ -1,21 +1,26 @@
 # 多账号运行（实验性）
 
-同一台机器上放两个学习通账号时看这份说明。默认用法仍是单账号；多账号只改变“通道和执行器怎么分配”，
-不改变授权、证据和停手规则。跨账号并发做过一次有界的视频节点实验（<运行日期>，两个视频同时播放 124.6 s）；
+同一台机器上放多个学习通账号时看这份说明。默认用法仍是单账号；多账号只改变“通道和执行器怎么分配”，
+不改变授权、证据和停手规则。跨账号并发做过两次有界视频实验（<运行日期>：A+B 重叠 124.6 s；A+C 见下文）；
 长视频、测验/提交并发仍未验证，不要扩大成“并发已通过”。
 
 ## 拓扑
 
-一个账号一条 `mcp-client` 条目、一个独立 `--user-data-dir`、一个标签：
+通用规则：**N 个账号 = N 条 `mcp-client` 条目 = N 个独立 `--user-data-dir` = N 个标签 = N 个执行器**。
+配置示例（不表示本机已登录状态）：
 
-| 账号别名 | 通道 | 工具前缀 | profile | 截图/快照目录 |
-|---|---|---|---|---|
-| `account-a` | `browser` | `mcp__browser__*` | `~/.dsh/browser/chrome-course` | `~/.dsh/browser/output` |
-| `account-b` | `browser2` | `mcp__browser2__*` | `~/.dsh/browser/chrome-clean` | `~/.dsh/browser/output2` |
+| 账号别名 | 通道 | 工具前缀 | profile | 截图/快照目录 | 状态 |
+|---|---|---|---|---|---|
+| `account-a` | `browser` | `mcp__browser__*` | `~/.dsh/browser/chrome-course` | `~/.dsh/browser/output` | 在用（本轮已登录） |
+| `account-b` | `browser2` | `mcp__browser2__*` | `~/.dsh/browser/chrome-clean` | `~/.dsh/browser/output2` | <运行日期> 退役，保留条目但不再调用 |
+| `account-c` | `browser3` | `mcp__browser3__*` | `~/.dsh/browser/chrome-new` | `~/.dsh/browser/output3` | 在用（「无人驾驶车辆」） |
 
-- 两条 `mcp-client` 条目的 id 必须不同（`mcp-browser` / `mcp-browser2`）；同 id 会覆盖前一条。配置形状见 [DSH 运行说明](dsh-runtime.md) 的「启用受支持的浏览器通道」。
+- 条目 id 必须不同（`mcp-browser` / `mcp-browser2` / `mcp-browser3`）；同 id 会覆盖前一条。新增第 N 个账号就复制一份，
+  只改 `id`、`serverName`、`--user-data-dir`、`--output-dir` 四处；配置形状见 [DSH 运行说明](dsh-runtime.md) 的「启用受支持的浏览器通道」。
+- **不要复用退役账号的 profile**：`chrome-clean` 里可能有旧示例账号 的 cookie，会把新账号登成旧账号。<运行日期> 用全新
+  `chrome-new` 登录 account-c，登录后页面显示的是新账号本人（不是 account-b），没有串号。
 - 两个账号不能共用一个 `--user-data-dir`：登录态会互相踩，平台也会看到同一个浏览器里的两个会话。
-- `--output-dir` 也不同：`browser_take_screenshot` 的 `filename` 落在各自目录，别把 B 的截图当 A 的。
+- `--output-dir` 也不同：`browser_take_screenshot` 的 `filename` 落在各自目录，按所属通道保留截图来源。
 
 ## 规则
 
@@ -24,19 +29,23 @@
 - 跨账号并发只在“可中断的边界”发生：一个账号不在提交、不在计时测验、不在答题页时，另一个账号才开工。先只读动作，再考虑长节点。
 - 成本分开算：每个账号的节点用各自的子 agent 会话跑 `session_cost.py`，不要合成一个数；`evidence.json` 的 `account_alias` 必填（见 [本地状态与交接](state.md)）。
 - **任一账号出现验证码、9010、多终端登录提醒或日上限（`.maskDiv.jobCountDiv` 几何尺寸 > 0）→ 两个都停**，保留两侧现场（标签、截图、evidence），不重试、不换通道重试、不删痕迹。
-- 登录态不保证跨重启保持：<运行日期> 实测 `browser2` 的页面在会话间回到 `about:blank`，导航到 `i.chaoxing.com` 落到登录页。重新登录由用户完成；密码只用一次，不写入任何文件、不回显。
+- 登录态不保证跨重启保持：<运行日期> 实测 `browser2` 的页面在会话间回到 `about:blank`；<运行日期> 电脑重启后 account-a 也落到 `passport2.chaoxing.com` 登录页，重新账密登录（无验证码）。重新登录由用户完成或用户明确授权时由 Agent 代输一次；密码不写入任何文件、不回显。
+- 新增一条通道会重载 MCP，但不必重启 harness：<运行日期> 在 `insert` 里加 `mcp-browser3` 后，当前会话的工具面直接出现 `mcp__browser3__*`（25 个工具）。仍只在节点边界改配置。
+- 登录页的“下次自动登录”勾选与平台会话策略由平台决定，不在技能控制范围；不要在未确认时声称登录已保持。
 
 ## 配置限制
 
-`local/private.toml` 是**本机一份**，两个账号共用：要一个账号 `completion`、另一个 `evidence`，本版做不到按账号分开。
+`local/private.toml` 是**本机一份**，所有账号共用：要一个账号 `completion`、另一个 `evidence`，本版做不到按账号分开。
 只能分两次跑，并在每次的 `evidence.json` 里写明本次 `mode`；不要同时用两种模式跑两个账号。
+多账号视频并发可以都按 `evidence`（不提交）跑；要提交时先确认**每个账号各自**的授权，不能把一个账号的授权用于另一个账号。
 
 ## 实测范围（<运行日期>）
 
 - 顺序：示例账号 停在已完成课程目录（只读、无动作）；示例账号 正常登录 → 读完成课 → 取 SRT 230 条 → `gate` supported exit 0 → 还原 1x、暂停、静音。B 的完成课倍速菜单在 DOM 里但不可见，菜单点击无效，属性写 2 读回 2——这是按课程出现的行为，不是“完成课都能 2x”。
 - 只读冒烟：两条通道同时读当前页标题，各自返回自己的课程名，没有验证码、没有多终端提醒。
-- **有界并发视频（<运行日期>）**：A 的「示例课程10」1.3（234.6 s）和 B 的 1.1（381.2 s）同时跑；都用官方 2x 菜单、读回 2；两段播放重叠 **124.6 s**，都 `ended`；任务点各自 1→0；A 13 次调用 / 0.53M token，B 18 次 / 0.74M；两边 `--audit-submit` clean；无验证码、无多终端提醒；结束时两边各 1 个标签。记录：`runs/multi-account-concurrency-20261020/result.json`。
-- **未做**：长视频（>900 s）并发、测验并发、提交并发、同一账号开两个标签、第二次重复性实验。一次通过不等于可重复，下一次仍按停手条件走。
+- **有界并发视频 A+B（<运行日期>）**：A 的「示例课程10」1.3（234.6 s）和 B 的 1.1（381.2 s）同时跑；都用官方 2x 菜单、读回 2；两段播放重叠 **124.6 s**，都 `ended`；任务点各自 1→0；A 13 次调用 / 0.53M token，B 18 次 / 0.74M；两边 `--audit-submit` clean；无验证码、无多终端提醒；结束时两边各 1 个标签。记录：`runs/multi-account-concurrency-20261020/result.json`。
+- **有界并发视频 A+C（<运行日期>）**：A 的「丝绸之路上的民族」4.3（834.133 s，锁 1x）与 C 的「无人驾驶车辆」1.1（503.488 s，官方菜单 2x）各一个子 agent 同时跑；两边都只做视频、不开测验、不提交。C 起播 18:07:22.590、结束 18:11:34.536，A 起播 18:05:43.758、结束 18:19:38.638，**真实重叠 251.9 s**（C 整段都在 A 的窗口内）。A 任务点 2→1、24 次调用 / 1.08M token；C 任务点 1→1（视频 `ended` 但未清）、25 次 / 1.28M。两边都无验证码、无多终端，`.maskDiv.jobCountDiv` 几何尺寸 0×0，`--audit-submit` clean。C 的 2x 是否计入任务点**未判定**（也可能是该 1 分本来就是测验），下次用 1x 重播同一节确认。记录：`runs/multi-account-ac-20261020/RUN_LOG.md` 与两边 `evidence.json`。
+- **未做**：长视频（>900 s）并发、测验并发、提交并发、同一账号开两个标签、第三次重复性实验、C 的 2x 任务点归因（1x 复测）。两次通过不等于可重复，下一次仍按停手条件走。
 
 ## 记录与恢复
 
