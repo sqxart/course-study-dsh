@@ -2,7 +2,7 @@
 
 版本基线：DeepSeek Harness 桌面版 0.2.1-rc.2，profile `desktop`。本文件只写本机实测或当前版本包文档能互相印证的结论；历史小节只反映对应版本快照，**不等于当前能力**。其他 harness（ZCode/Codex）的 bootstrap、CDP 名称、写权限或调用时限不适用于本技能。
 
-## 当前通道（<运行日期>，1.0.9）
+## 当前通道（<运行日期>，1.0.10）
 
 浏览器由 profile 的 `cordis.patch.yml` 中的 Playwright MCP 提供。下面是多通道配置形状，实际启用、登录和退役状态从本地配置读取；退役条目不再调用。
 
@@ -282,9 +282,18 @@ v24 新布局与旧 mooc2 目录不同：旧的 `#cur<chapterId>` 选择器可�
 - **属性写入会被播放器覆盖**：实测把 `playbackRate` 设成 1、读回来仍是 2——播放器按自己的菜单状态重设。所以设置后必须**读回校验**；读回不一致就记 `menu-failed`，不要声称已改速率。
 - **弹题提交后可能没有判定**：v24 播放器里点提交，弹窗直接消失，`.spanHas` / `.spanNot` / `#videoquiz-continue` 全部不可见，`#rightNum` 为 null；任务点数也不变。**提交成功 ≠ 计入**，唯一可信的验收是回目录看尾部任务点数。
 - **剩下的任务点通常是章节测验，不是弹题**：小节页顶部任务栏分「视频 / 章节测验」，写着「任务点已完成」说明视频那一项已经算完；任务点数还挂着 1 时，要补的是测验。
-- **v24 章节测验流程（实测两节 <成绩>分）**：点「章节测验」→ 内层 iframe `mooc1.chaoxing.com/mooc-ans/work/doHomeWorkNew?workId=...` → **对 frame body 做元素截图**（视口截图只能拍到前两题）→ `quiz_ocr.py` → `quiz_panel.py` → 从 `li[role=radio]` 读 `qid` / `qtype`（单选 `span[data]` 是 A–D，判断是 `true` / `false`）→ `li[qid=X].nth(i)` 点击 → 核对 `input[name=answer<qid>]` 与 `aria-checked` → 点 `.btnSubmit` → 主页面 `#workpop` 点「提交」→ 结果帧 `selectWorkQuestionYiPiYue` 显示「已完成 / 第1次作答 / 本次成绩」。**提交后该帧就是明文**（题干 + 我的答案 + 正确答案 + 得分），可直接当复盘与题库来源。旧播放器的弹题控件要点 `input[type=radio]`，v24 测验页要点 `li[qid]`，进页先探骨架。
-- 实测：381.16 s 的 1.1 以 2x 静音播完，用 187 s；回目录后 1.1 的尾部任务点数消失、1.2–1.19 仍在 → **2x 被平台正常计入**。这门课没有弹题，观察器一次跑到底，没有 282 s 空转。
-- 代价：首次遇到新布局花了约 24 次调用（探索）；按上面的配方应压到 6–8 次。
+- **v24 章节测验流程**：点「章节测验」→ 内层 iframe `mooc1.chaoxing.com/mooc-ans/work/doHomeWorkNew?workId=...` → **对 frame body 做元素截图**（视口截图只能拍到前两题）→ `quiz_ocr.py` → `quiz_panel.py` → 从 `li[role=radio]` 读 `qid` / `qtype`（单选 `span[data]` 是 A–D，判断是 `true` / `false`）→ `li[qid=X].nth(i)` 点击 → 核对 `input[name=answer<qid>]` 与 `aria-checked` → 点 `.btnSubmit` → 主页面 `#workpop` 点「提交」→ 结果帧 `selectWorkQuestionYiPiYue` 显示「已完成 / 第1次作答 / 本次成绩」。**提交后该帧就是明文**（题干 + 我的答案 + 正确答案 + 得分），可直接当复盘与题库来源。旧播放器的弹题控件要点 `input[type=radio]`，v24 测验页要点 `li[qid]`，进页先探骨架。
+- **三个提交坑**：① `doHomeWorkNew` 帧 URL 先出现、`.TiMu` 后渲染，必须**等 `.TiMu` 出现**再截图/作答；在空帧上点 `.btnSubmit` 完全无响应。② `#workpop` 的可见副本在 **studentstudy 帧**（不是工作帧、也不在顶层页），确认要点 `#workpop a.jb_btn`「提交」。③ 多选隐藏 `input[name=answer<qid>]` 存 `ABC`（**不带逗号**），按 `A,B,C` 比对会误判、白放弃一次提交。弹题的判断题 radio 若点 `li` 不变，需 `input.checked=true` + `dispatchEvent(new Event('change',{bubbles:true}))`。
+
+## 两账号各 10 节点（<运行日期> 实测）
+
+- 范围：account-a 10 节（丝路 4.3/4.4/5.1–5.3 + 网络安全 1.4–1.8），account-c 10 节（无人驾驶 1.1/1.2/1.3/2.1/2.2.1/2.2.2/2.3/2.4.1/2.4.2/2.5）；视频 + 章节测验，全部任务点清零。
+- 15 次章节测验各提交一次：**13×100 + 2×50**（A 5.2/5.3 多选错；`redo_once=false` 未重做）；网络安全 1.4–1.8 本身没有章节测验。
+- 独立回读目录：20 行全部无尾部任务点数字；20 份 evidence 过 `check_evidence.py`；无验证码/9010/多终端/日上限/登出。
+- 视频合计 **9207.544 s**；20 节点 token 合计 **16.60M**（含两个试点异常：A 4.3 5.40M/74 次、C 1.1 1.74M/28 次）；去掉这两个异常后 **18 节点平均 0.53M/节点**。
+- 稳定态：纯视频节点 **0.20–0.55M / 5–14 次调用**；视频+测验 **0.43–0.74M / 8–25 次**。观察器 220 s；400 s@2x 的视频通常 1 次观察器就 `ended`。
+- **workflow 编排**：`workflow` 的 `agent()` 每节点一个子 agent，两个账号各一条串行链、两条链并行；主会话只发一次编排调用收结构化结果，省掉逐节点 spawn/汇总的主上下文开销。节点 prompt 必须写死工具白名单（只用 `browser_run_code_unsafe`/`pwsh`/`write`）、禁止 web/文档/snapshot、18 次调用上限、固定代码配方与 evidence 模板。
+- 反例：A 4.3 的 74 次/5.40M 来自读文档 + `web_search` 找题 + `browser_snapshot` 试探；同一门课的 4.4 用紧凑配方是 16 次/0.65M。
 
 ## 节点级隔离与调用预算（M1）
 
