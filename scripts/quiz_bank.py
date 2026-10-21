@@ -359,6 +359,11 @@ def main(argv=None):
     cover.add_argument('bank')
     cover.add_argument('--json', action='store_true')
 
+    section = sub.add_parser('section', help='Print one section of questions for a note writer')
+    section.add_argument('--bank', required=True)
+    section.add_argument('--code', required=True)
+    section.add_argument('--json', action='store_true')
+
     args = parser.parse_args(argv)
     if args.command == 'check':
         report = check_capture(args.capture)
@@ -368,6 +373,28 @@ def main(argv=None):
     if args.command == 'coverage':
         bank = json.loads(Path(args.bank).read_text(encoding='utf-8'))
         print(json.dumps(bank.get('stats'), ensure_ascii=False, indent=2) if args.json else brief(bank))
+        return 0
+
+    if args.command == 'section':
+        bank = json.loads(Path(args.bank).read_text(encoding='utf-8'))
+        found = [section for chapter in bank['chapters'] for section in chapter['sections']
+                 if section['section'] == args.code]
+        if not found:
+            print('section not in bank: ' + args.code, file=sys.stderr)
+            return EXIT_EMPTY
+        record = found[0]
+        if args.json:
+            print(json.dumps(record, ensure_ascii=False, indent=2))
+            return 0
+        print('{0} {1} · {2} 题 · {3}/{4} 分'.format(
+            record['section'], record['section_title'] or '', len(record['questions']),
+            record['total_score'], record['full_score']))
+        for question in record['questions']:
+            print('{0}. {1}{2}'.format(question['idx'], question.get('type_label') or '', question['stem']))
+            for option in question.get('options') or []:
+                print('   {0}. {1}'.format(option['key'], option['text']))
+            print('   正确答案：{0}   我的答案：{1}'.format(
+                question.get('correct') or '（平台未开放）', question.get('my_answer') or '—'))
         return 0
 
     expected = None

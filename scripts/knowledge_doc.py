@@ -1,10 +1,10 @@
-"""Assemble the course knowledge document from per-section notes and the bank.
+"""Assemble the course knowledge document from per-section exam notes and the bank.
 
 Two deliverables, deliberately separate:
 
 * `bank.md` / `bank.json` — the questions: stem, options, my answer, score.
-* `knowledge.md` — what the video taught: concepts, reasoning, numbers, worked examples,
-  each claim anchored to a subtitle timestamp.
+* `knowledge.md` — the exam knowledge: for the concepts this section's questions test,
+  what they mean, how the question is phrased, and what gets confused with what.
 
 The notes are written by one agent per section from that section's full subtitle file
 (`notes/<course>/<section>.md`, format in references/knowledge.md). This module only
@@ -19,14 +19,16 @@ import re
 import sys
 from pathlib import Path
 
-REQUIRED_SECTIONS = ('本节讲什么', '要点', '关键概念', '本节结论')
+REQUIRED_SECTIONS = ('考点知识', '概念表')
+FORBIDDEN_SECTIONS = ('本节讲什么', '本节结论', '要点')
+DEPRECATED_MARKERS = ('【单选题】', '【多选题】', '【判断题】', '我的答案：', '正确答案：')
+BANK_MARKERS = DEPRECATED_MARKERS
+MIN_POINTS = 5
+MIN_CHARS = 300
 _CLOCK = r'\d{1,2}:\d{2}(?::\d{2})?'
-# Notes anchor a claim to a range as often as to a single cue, so both forms count.
+# A knowledge point is anchored to a cue or a range; both count.
 TIMESTAMP = re.compile(r'[\[(（]\s*' + _CLOCK + r'(?:\s*[–—~-]\s*' + _CLOCK + r')?\s*[\])）]')
 POINT = re.compile(r'^\s*\d+[.、]\s+\S', re.M)
-MIN_POINTS = 5
-MIN_CHARS = 400
-BANK_MARKERS = ('【单选题】', '【多选题】', '【判断题】', '我的答案：')
 
 
 def clean(value):
@@ -34,7 +36,7 @@ def clean(value):
 
 
 def validate_note(text):
-    """Return (problems, stats). A note must explain, not list words or echo the bank."""
+    """Return (problems, stats). A note must teach the exam points, not summarise the video."""
     problems = []
     body = (text or '').strip()
     if not body:
@@ -42,6 +44,9 @@ def validate_note(text):
     for heading in REQUIRED_SECTIONS:
         if heading not in body:
             problems.append('missing section: ' + heading)
+    for heading in FORBIDDEN_SECTIONS:
+        if '**{0}**'.format(heading) in body:
+            problems.append('old summary format is retired: ' + heading)
     points = len(POINT.findall(body))
     timestamps = len(TIMESTAMP.findall(body))
     chars = len(re.sub(r'\s+', '', body))
@@ -49,6 +54,10 @@ def validate_note(text):
         if marker in body:
             problems.append('looks like quiz text, not a note: ' + marker)
             break
+    if body.count('含义') < 3:
+        problems.append('fewer than 3 "含义" lines: each point needs its meaning')
+    if body.count('怎么考') < 3:
+        problems.append('fewer than 3 "怎么考" lines: each point needs how it is asked')
     if points < MIN_POINTS:
         problems.append('only {0} numbered points, need {1}'.format(points, MIN_POINTS))
     if timestamps < 3:
@@ -84,11 +93,11 @@ def build_knowledge(bank, notes, generated_at=None):
         '# {0} 知识总结'.format(bank.get('course_title') or bank['course']),
         '',
         '- 覆盖：{0}/{1} 节有总结（其余无字幕或未整理）'.format(len(with_notes), len(sections)),
-        '- 依据：课程视频字幕原文；每条要点括号里是字幕时间，可直接回看',
-        '- 与题库的关系：题目、选项、我的答案、得分在 `bank.md`，本文件不复述题目',
+        '- 依据：课程视频字幕原文；每条考点括号里是字幕时间，可直接回看',
+        '- 与题库的关系：题目、选项、我的答案、得分在 `bank.md`，本文件只写支撑这些题的知识',
         '- 生成时间：{0}'.format(generated_at or datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat()),
         '',
-        '> 只写视频里讲过的内容：定义、判断依据、示例与结论都来自字幕；字幕没讲的（包括平台没开放的正确答案）不补。',
+        '> 只写视频里讲过的内容：定义、判断依据、易混区别都来自字幕；字幕没讲的（包括平台没开放的正确答案）不补。',
     ]
     for chapter in bank['chapters']:
         lines += ['', '## {0}'.format(_chapter_label(chapter)), '']

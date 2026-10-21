@@ -21,34 +21,35 @@ def load():
 
 knowledge = load()
 
-GOOD_NOTE = """**本节讲什么**
-这一节回答「智能汽车为什么必须换掉分布式电子电气架构」，先讲线控底盘留下的问题，
-再给出新架构的三项硬指标，最后说明从域集中走向中央计算的路线图。结论是架构演进由带宽、
-实时性与功能安全三条约束共同推动，不是单纯的硬件升级。
+GOOD_NOTE = """**考点知识**
 
-**要点**
-1. **分布式架构的瓶颈**（00:00:46）：每个功能一个 ECU，线束长度和接插件数量随功能线性增长，
-   整车重量、成本与故障点都被拖高，软件升级也只能逐个控制器刷写。
-2. **高带宽**（00:01:17）：摄像头、激光雷达、毫米波雷达同时输出原始数据，带宽需求从几十 Mbps
-   抬到 Gbps 量级，分布式总线扛不住。
-3. **高实时性**（00:01:21）：底盘控制回路要求毫秒级确定性时延，网关转发的排队抖动不可接受。
-4. **高安全性与高可靠性**（00:01:22）：制动、转向属于功能安全范畴，任一节点失效都要有冗余路径。
-5. **域集中式**（00:03:40）：按功能域把多个 ECU 合并成域控制器，线束与算力集中，仍保留域间边界。
-6. **跨域集中与中央计算**（00:05:10）：进一步把座舱、智驾、车控跨域融合，最后收拢到中央计算平台
-   加区域控制器，软件按服务部署。
+1. **公地的悲剧 ↔ 产权经济学**（00:01:17–00:01:36）
+   - 含义：公共资源因产权边界没有界定，谁都能用、没人爱护，因而被过度使用。
+   - 怎么考：问"从什么视角看"选产权经济学；问"原因"答产权不明晰。
+   - 易混：福利经济学把同一现象叫外部性，选项常把两者并列。
 
-**关键概念**
-- 电子电气架构（EEA）：整车控制器、传感器、执行器之间的拓扑与通信方式，决定线束、算力与升级路径。
-- 域控制器：按功能域聚合多个 ECU 的控制器，负责本域的实时调度与故障隔离。
-- 区域控制器：按物理位置聚合 IO，把「按功能」变成「按位置」，减少跨车线束。
+2. **视角决定解决方案**（00:06:39–00:07:33）
+   - 含义：归因不同，法律与政策方案就不同；产权视角导向私有化，福利经济学视角导向政府管制。
+   - 怎么考：给视角问方案，或给方案问视角。
+   - 易混：把"增强学龄前教育"当成法律视角的方案。
 
-**易混淆 / 易错**
-- 域集中式与跨域集中式：前者按功能域划分且域间边界清晰，后者打破域边界、由中央计算统一调度。
-- 高带宽与高实时性不是一回事：带宽解决数据量，实时性解决确定性时延，两者要分开设计。
+3. **公地悲剧的成立条件**（00:01:36–00:02:05）
+   - 含义：只有资源确实无人排他性使用、且使用会造成拥塞或损耗时，才谈得上公地悲剧。
+   - 怎么考：给一个仍然排他使用的资源，问是否构成公地悲剧。
 
-**本节结论**
-智能汽车需要高带宽、高实时性、高安全性与高可靠性的统一架构，演进路线是分布式 → 域集中 →
-跨域集中 → 中央计算，驱动力是数据量、时延与功能安全三条硬约束。
+4. **外部性与庇古税**（00:07:33–00:08:23）
+   - 含义：外部性是成本由他人承担；庇古传统主张用税收或管制把外部成本内部化。
+   - 怎么考：问福利经济学给出的政策工具。
+
+5. **产权学派的方案**（00:06:39–00:07:15）
+   - 含义：产权学派认为界定产权、允许交易即可内部化外部性。
+   - 怎么考：问科斯定理对应的政策含义。
+
+**概念表**
+
+- 公地的悲剧：产权不明晰导致的公共资源过度使用。
+- 外部性：一些人使用资源、成本由另一些人承担。
+- 庇古经济学：福利经济学传统，主张政府管制与税收调节。
 """
 
 
@@ -73,19 +74,24 @@ class ValidateTest(unittest.TestCase):
         self.assertGreaterEqual(stats['chars'], 400)
 
     def test_word_salad_is_rejected(self):
-        thin = ('**本节讲什么**\n高带宽。\n\n**要点**\n1. 高带宽\n2. 高实时性\n3. 高安全性\n'
-                '\n**关键概念**\n无\n\n**本节结论**\n就是这些。\n')
+        thin = ('**考点知识**\n1. 高带宽\n2. 高实时性\n\n**概念表**\n- 高带宽\n')
         problems, _ = knowledge.validate_note(thin)
         self.assertTrue(any('numbered points' in p for p in problems))
         self.assertTrue(any('chars' in p for p in problems))
+        self.assertTrue(any('含义' in p for p in problems))
+
+    def test_old_summary_format_is_retired(self):
+        old = GOOD_NOTE.replace('**考点知识**', '**本节讲什么**').replace('**概念表**', '**本节结论**')
+        problems, _ = knowledge.validate_note(old)
+        self.assertTrue(any('old summary format' in p for p in problems))
 
     def test_quiz_text_is_rejected(self):
         problems, _ = knowledge.validate_note(GOOD_NOTE + '\n【单选题】下面哪项正确\n')
         self.assertTrue(any('quiz text' in p for p in problems))
 
     def test_missing_section_is_named(self):
-        problems, _ = knowledge.validate_note(GOOD_NOTE.replace('**关键概念**', '**概念**'))
-        self.assertIn('missing section: 关键概念', problems)
+        problems, _ = knowledge.validate_note(GOOD_NOTE.replace('**概念表**', '**概念**'))
+        self.assertIn('missing section: 概念表', problems)
 
     def test_empty_note(self):
         problems, stats = knowledge.validate_note('')

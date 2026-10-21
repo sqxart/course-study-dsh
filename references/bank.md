@@ -35,16 +35,32 @@ async (page) => {
     p: [...e.querySelectorAll('span.catalog_points_yi')].map((s) => (s.innerText || '').trim())
   })));
   const rowsOf = (rows) => rows.filter((r) => /^\d+(\.\d+)*\s/.test(r.t));
+  // 新版课程门户默认停在「任务」标签，点「章节」才会加载 studentcourse 帧。
+  const ensureToc = async () => {
+    let frame = tocFrame();
+    if (frame) return frame;
+    const clicked = await page.evaluate(() => {
+      const el = [...document.querySelectorAll('a,li,div,span')]
+        .find((e) => (e.innerText || '').trim() === '章节' && /javascript/.test(e.getAttribute('href') || ''));
+      if (!el) return false;
+      el.click();
+      return true;
+    });
+    if (!clicked) return null;
+    await page.waitForTimeout(5000);
+    for (let i = 0; i < 10 && !tocFrame(); i++) await page.waitForTimeout(700);
+    return tocFrame() || null;
+  };
   const back = async () => {
     const href = await page.evaluate(() => { const a = document.querySelector('a.subBack'); return a ? a.href : null; });
     if (!href) return { ok: false };
     await page.goto(href, { waitUntil: 'domcontentloaded' }).catch(() => null);
     await page.waitForTimeout(4000);
     for (let i = 0; i < 10 && !tocFrame(); i++) await page.waitForTimeout(700);
-    return { ok: !!tocFrame() };
+    return { ok: !!(await ensureToc()) };
   };
 
-  let toc = tocFrame();
+  const toc = await ensureToc();
   if (!toc) return { ok: false, reason: 'no-toc-frame', course: COURSE, section: SECTION };
   const rowsAll = await readRows();
   // Keep the unfiltered index: .nth() must address the same element list the rows came from.
