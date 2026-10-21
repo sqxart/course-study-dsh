@@ -13,16 +13,19 @@ Harness 的通道事实、已实测范围与调用预算在 [DSH 运行说明](r
 1. 确认当前工具面：当前账号对应的 `mcp__browser__browser_*`、`mcp__browser2__browser_*` 或 `mcp__browser3__browser_*`（一个账号只用一条）、`pwsh`、`read/edit`。缺少受支持的浏览器通道时只做离线工作，不去找隐藏调试接口或自建 CDP 脚本。
 2. 先读 `local/private.toml`：没有文件就按证据模式（`mode=evidence`、`submit=false`）；有则按其 `mode` 与 `submit` 执行，并在记录里写明本次模式。然后确定平台、课程、账号别名、任务类型与已有授权；续跑先读 `local/CURRENT_HANDOFF.md` 与 `local/active-session.json`，再核验平台实际状态。
    **证据模式**下章节测验只读：打开答题页、截图/OCR、摆证据，**不点选项、不点提交、不重开**；视频和弹题照常完成。打开答题页会生成 `#workAnswerId`，平台学习记录里会标成**已查看**（无分数、不是已完成）；1.2.3 实测 `#addTimes` 仍为 0、没有消耗提交次数，但“已查看”是可见痕迹。用户明确不想留下查看记录时，停在目录并报告“测验未打开”，不要自行打开。
-3. 按任务只读所需材料：
+3. **先确认要做哪一个功能**，再只读那一条流程（详见 [四种功能](references/modes.md)）：
 
-   | 任务 | 流程 | 平台知识 |
-   |---|---|---|
-   | 看课、续跑、弹题、章节测验 | [单节点快速配方](references/quickstart.md) → [网课流程](references/course-flow.md) | [学习通](references/chaoxing.md) |
-   | 已提交节点取题库（只读） | [题库取数](references/bank.md) | 结果页明文；正确答案是否可见每课一策 |
-   | 从字幕写知识总结 | [知识总结](references/knowledge.md) | 只收能出选择题/判断题的客观知识；题库与知识总结分两份文件；无字幕节由 `[asr]` 开关决定做不做 |
-   | 摸不清的现象、报错、旧坑 | [现场笔记](references/field-notes.md) | 先查这里再动手 |
-   | 两个账号 / 两条浏览器通道 | [多账号运行](references/multi-account.md) | 一个账号一条通道、一个标签 |
-   | 有无新课件/测验、截止时间 | 网课流程的列表巡检 | 先停在列表；开始测验是后续独立动作 |
+   | # | 功能 | 产出 | 流程 | 平台知识 |
+   |---|---|---|---|---|
+   | 1 | 全节点完成：视频 + 弹题 + 章节测验 | 该节点任务点全亮 | [单节点快速配方](references/quickstart.md) → [网课流程](references/course-flow.md) | [学习通](references/chaoxing.md) |
+   | 2 | 单独完成视频 **或** 单独完成章节测验 | 只推进其中一个任务点 | [四种功能](references/modes.md) §2a / §2b | 同上 |
+   | 3 | 形成课程题库（只读） | `knowledge/<course>/bank.json` + `bank.md` | [题库取数](references/bank.md) | 结果页明文；正确答案是否可见每课一策；`bank.md` 不写题号、正确选项打 `✓` |
+   | 4 | 总结课程知识文档 | `knowledge/<course>/knowledge.md` | [知识总结](references/knowledge.md) | 只收能出选择题/判断题的客观知识；无字幕节由 `[asr]` 开关决定做不做 |
+
+   其他参考：摸不清的现象先查 [现场笔记](references/field-notes.md)；两个账号 / 两条通道看 [多账号运行](references/multi-account.md)；
+   有无新课件/测验、截止时间走网课流程的列表巡检，先停在列表，开始测验是后续独立动作。
+
+   3、4 是**只读**功能（不点选项、不提交、不重做）；1、2 会写平台状态，必须有本次授权。同一账号、同一标签同一时间只跑一个功能。
 
 4. 使用独立任务目录 `runs/<task-id>/`，记录账号别名、课程键、当前标签/执行器、已有授权、进行中的测验和证据。格式见 [状态与交接](references/state.md)。
    节点结束**先把 `runs/<task-id>/evidence.json` 写到盘上再汇报**（视频时长、倍率与 `rate_source`、弹题题干与证据、测验 `submitted`/`decision`、任务点前后、调用数、偏差）；写完用 `scripts/check_evidence.py --require-readonly` 自检。
