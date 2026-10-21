@@ -153,6 +153,8 @@ async (page) => {
         add_times: (document.querySelector('#addTimes') || {}).value || null,
         limit_work_submit_times: (document.querySelector('#limitWorkSubmitTimes') || {}).value || null,
         submit_button: !!document.querySelector('.btnSubmit'),
+        // 有的课允许重做（结果页会写「重做 (剩余 N 次)」）。只记录，绝不可点。
+        retake_present: /重做\s*[(（]\s*剩余/.test(body),
         timu: questions.length
       },
       answer_visible: /正确答案/.test(body),

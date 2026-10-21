@@ -80,7 +80,7 @@ def main(argv=None):
             except Exception as again:  # noqa: BLE001
                 failed.append('{0}: {1}'.format(section, again))
                 continue
-        module.write_atomic(target, text)
+        module.write_atomic(target, module.decode_bytes(text))
         saved += 1
         time.sleep(args.delay)
     expected = None
