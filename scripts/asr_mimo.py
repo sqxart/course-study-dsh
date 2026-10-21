@@ -49,12 +49,42 @@ def read_key(args):
     raise SystemExit('no API key: set MIMO_API_KEY or write ' + str(path))
 
 
-def fetch(url, target, timeout=600, referer='https://mooc1.chaoxing.com/'):
-    """The media CDN answers 403 without a platform Referer; no cookie is needed."""
-    request = urllib.request.Request(url, headers={
-        'User-Agent': 'Mozilla/5.0', 'Referer': referer, 'Accept': '*/*'})
-    with urllib.request.urlopen(request, timeout=timeout) as response, open(target, 'wb') as handle:
-        shutil.copyfileobj(response, handle)
+def fetch(url, target, timeout=600, referer='https://mooc1.chaoxing.com/', attempts=8):
+    """Download with resume: the media CDN drops the connection every few MB.
+
+    It also answers 403 without a platform Referer (no cookie is needed). Each retry asks
+    for the missing byte range, so a 30 MB lecture costs several short responses, not a
+    restart from zero.
+    """
+    headers = {'User-Agent': 'Mozilla/5.0', 'Referer': referer, 'Accept': '*/*'}
+    for attempt in range(attempts):
+        have = os.path.getsize(target) if os.path.exists(target) else 0
+        request_headers = dict(headers)
+        if have:
+            request_headers['Range'] = 'bytes={0}-'.format(have)
+        request = urllib.request.Request(url, headers=request_headers)
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                total = response.headers.get('Content-Range')
+                expected = None
+                if total and '/' in total:
+                    expected = int(total.rsplit('/', 1)[1])
+                elif response.headers.get('Content-Length'):
+                    expected = have + int(response.headers['Content-Length'])
+                mode = 'ab' if have and response.status == 206 else 'wb'
+                if mode == 'wb' and have:
+                    have = 0
+                with open(target, mode) as handle:
+                    shutil.copyfileobj(response, handle)
+        except Exception:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(1.5)
+            continue
+        size = os.path.getsize(target)
+        if expected is None or size >= expected:
+            return size
+        time.sleep(0.8)
     return os.path.getsize(target)
 
 
