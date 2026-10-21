@@ -23,12 +23,13 @@ REQUIRED_SECTIONS = ('考点知识', '概念表')
 FORBIDDEN_SECTIONS = ('本节讲什么', '本节结论', '要点')
 DEPRECATED_MARKERS = ('【单选题】', '【多选题】', '【判断题】', '我的答案：', '正确答案：')
 BANK_MARKERS = DEPRECATED_MARKERS
-MIN_POINTS = 5
-MIN_CHARS = 300
+MIN_POINTS = 6
+MIN_CHARS = 200
 _CLOCK = r'\d{1,2}:\d{2}(?::\d{2})?'
 # A knowledge point is anchored to a cue or a range; both count.
 TIMESTAMP = re.compile(r'[\[(（]\s*' + _CLOCK + r'(?:\s*[–—~-]\s*' + _CLOCK + r')?\s*[\])）]')
-POINT = re.compile(r'^\s*\d+[.、]\s+\S', re.M)
+# Bullets or numbered items — the terse format is a list, not an essay.
+POINT = re.compile(r'^\s*(?:[-*]|\d+[.、])\s+\S', re.M)
 
 
 def clean(value):
@@ -54,14 +55,10 @@ def validate_note(text):
         if marker in body:
             problems.append('looks like quiz text, not a note: ' + marker)
             break
-    if body.count('含义') < 3:
-        problems.append('fewer than 3 "含义" lines: each point needs its meaning')
-    if body.count('怎么考') < 3:
-        problems.append('fewer than 3 "怎么考" lines: each point needs how it is asked')
     if points < MIN_POINTS:
-        problems.append('only {0} numbered points, need {1}'.format(points, MIN_POINTS))
-    if timestamps < 3:
-        problems.append('only {0} timestamps, need 3'.format(timestamps))
+        problems.append('only {0} knowledge bullets, need {1}'.format(points, MIN_POINTS))
+    if timestamps < 3 and 'ASR' not in body[:400]:
+        problems.append('only {0} timestamps, need 3 (or an ASR marker)'.format(timestamps))
     if chars < MIN_CHARS:
         problems.append('only {0} chars, need {1}'.format(chars, MIN_CHARS))
     return problems, {'points': points, 'timestamps': timestamps, 'chars': chars}

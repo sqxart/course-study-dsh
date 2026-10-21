@@ -223,6 +223,17 @@ def _answer_cell(question):
     return '未提供（平台未开放正确答案）'
 
 
+def _my_answer_line(question):
+    """Only shown when the platform hid the key: then the answer chosen is the only clue."""
+    if question['correct']:
+        return None
+    if not question.get('my_answer'):
+        return None
+    mark = {'correct': '✓', 'wrong': '✗', 'partial': '△'}.get(question.get('verdict'), '?')
+    return '我的答案：{0} {1}（得分 {2}/{3}）'.format(
+        question['my_answer'], mark, question.get('score'), question.get('max_score'))
+
+
 def render_bank_markdown(bank):
     """Human-readable mirror of bank.json: one block per question, answers marked honestly."""
     stats = bank['stats']
@@ -260,13 +271,13 @@ def render_bank_markdown(bank):
                 section['full_score'], section['attempt'] or '?'))
             lines.append('')
             for question in section['questions']:
-                mark = {'correct': '✓', 'wrong': '✗', 'partial': '△'}.get(question['verdict'], '?')
                 lines.append('{0}. {1}{2}'.format(question['idx'], question['type_label'] or '', question['stem']))
                 for option in question['options']:
                     lines.append('   - {0}、{1}'.format(option['key'], option['text']))
-                lines.append('   - 我的答案：{0} {1} 得分 {2}/{3}'.format(
-                    question['my_answer'] or '—', mark, question['score'], question['max_score']))
                 lines.append('   - 正确答案：{0}'.format(_answer_cell(question)))
+                mine = _my_answer_line(question)
+                if mine:
+                    lines.append('   - ' + mine)
                 if question['qid']:
                     lines.append('   - 题号：{0}'.format(question['qid']))
                 lines.append('')
