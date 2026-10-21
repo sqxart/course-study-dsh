@@ -45,9 +45,15 @@
 
 ## 2. 调用方式（一节一个 agent，可并行）
 
-- 字幕：先看 `runs/<task>/subs/<course>/<section>.srt` 有没有现成文件（功能 1/2 会顺手存），
-  没有再取；无字幕且 `[asr] enabled = true` 时用 `scripts/asr_mimo.py --chunk-seconds 90` 转写（见 §3）。
+- 原文按**节点类型**取，不是只有「字幕」一条路：
+  | 节点形态 | 原文来源 |
+  |---|---|
+  | 有字幕的视频 | `runs/<task>/subs/<course>/<section>.srt`（功能 1/2 顺手存的） |
+  | 无字幕的视频 | `scripts/asr_mimo.py --chunk-seconds 90` 转写（`[asr] enabled = true` 时） |
+  | 富文本节点（`knowledge/cards` 正文 ≥ 800 字） | 直接取 `cards` 的 `innerText`，不要花钱转写 |
+  | 文档型节点（`ananas/modules/pdf`） | 查看器页图（`s3.cldisk.com/.../thumb/N.png`，匿名可下）→ `scripts/quiz_ocr.py` |
   两者都没有才回节点取 `allsubtitle`——**不要为了字幕再刷一遍视频**。
+  同一课程可以混用这几种节点，逐节点检查。
 - 该节题目（只用于定位考点，**不许抄进产出**）：
   `python scripts/quiz_bank.py section --bank knowledge/<course>/bank.json --code <section>`。
 - 产出：`runs/<task>/notes/<course>/<section>.md`，写完跑

@@ -129,12 +129,12 @@ def build_knowledge(bank, notes, generated_at=None):
     lines = [
         '# {0} 知识总结'.format(bank.get('course_title') or bank['course']),
         '',
-        '- 覆盖：{0}/{1} 节有总结（其余无字幕或未整理）'.format(len(with_notes), len(sections)),
-        '- 依据：课程视频字幕原文（无字幕则 ASR 转写）；只收能出选择题/判断题的客观知识',
+        '- 覆盖：{0}/{1} 节有总结（其余无原文或未整理）'.format(len(with_notes), len(sections)),
+        '- 依据：该节原文——字幕、无字幕时的 ASR 转写、课程正文或文档页图 OCR（按节点实际类型取其一）；只收能出选择题/判断题的客观知识',
         '- 与题库的关系：题目、选项、我的答案、得分在 `bank.md`，本文件只写支撑这些题的知识',
         '- 生成时间：{0}'.format(generated_at or datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat()),
         '',
-        '> 只写视频里讲过的内容：定义、判断依据、易混区别都来自字幕；字幕没讲的（包括平台没开放的正确答案）不补。',
+        '> 只写原文讲过的内容：定义、判断依据、易混区别都来自该节原文；原文没讲的（包括平台没开放的正确答案）不补。',
     ]
     for chapter in chapters:
         lines += ['', '## {0}'.format(chapter['label']), '']
