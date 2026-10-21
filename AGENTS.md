@@ -1,6 +1,6 @@
 # course-study-dsh workspace (DeepSeek Harness only)
 
-本仓库是 DeepSeek Harness 专用课程技能的源码，<运行日期> 从 `C:/publicworkspace/course-study-v2`（提交 `46c4ea8`）分叉而来。
+本仓库是 DeepSeek Harness 专用课程技能的源码，<运行日期> 从同名的 v2 仓库（提交 `46c4ea8`）分叉而来。
 两份仓库此后各自演进：这里不保留 ZCode/Codex 适配文件，也不把改动回写到共用源。
 
 ## Current work

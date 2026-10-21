@@ -13,6 +13,20 @@
 - 只用当前账号那条通道（`mcp__browser__*` / `mcp__browser2__*` / `mcp__browser3__*` 之一，见 [多账号运行](multi-account.md)），不要跨账号混用；不要用 `browser_evaluate` 去读 `mooc2-ans` 目录帧——它被 `document.domain` 隔离，读不到。
   目录和播放器都在 `page.frames()` 里，用 `browser_run_code_unsafe` 的 `page`。
 - 观察器单次 **175 秒**（本机 `toolCallTimeoutMs=300000`），返回 `timeout` 就续一段，不算失败。
+- **一节里可能有多个视频。** `ananas/modules/video` 常匹配到 **2 个 iframe**，而 `cards` 帧写明的完成条件是
+  **「观看时长需 ≥ 总时长的 90%」**。只播第一个就永远拿不到那个任务点：若第一段占总时长不足 90%，只播它不能完成视频点；补播其余视频后再核对目录。
+  → **遍历所有视频帧逐个播到 `ended`，不要 `.find()` 取第一个。**
+
+## 0b. 两种节点形态，先判断走哪条
+
+| 形态 | 判断 | 走法 |
+|---|---|---|
+| 视频 + 测验 | 目录行尾 > 0，且「视频」页签里 `video.currentTime` 没到末尾 | 下面 §1–§6 的完整流程 |
+| **纯测验**（视频已完成） | 课程页进度显示视频点已清零，或播放器显示已完成 | 跳过 §1–§3，直接 §4 打开测验；每节约 **40–<时长>秒、5–8 次调用** |
+
+纯测验模式下不要为了"确认视频"再播一遍：既浪费时间，也会让 `video.ended` 这种字段变成假证据
+（本节视频不是这一轮看的，就不该声称 `ended`）。
+
 
 ## 1. 进节点 + 静音 + 选速 + 起播 + 拿字幕 URL（1 次调用）
 
@@ -91,6 +105,10 @@ async (page) => {
 ```
 
 > 属性写入后必须读回：读回不是 `pick` 就记 `rejected`，按实际速率播。锁速课程菜单里没有 `2x/1.5x/1.25x` 时不会进入这个分支，`rateSource` 直接是 `locked`。
+>
+> 下面的 `page.frames().find(...)` **只返回第一个播放器**。多视频节要把
+> `page.frames().filter(f => f.url().includes('ananas/modules/video'))` 全部取出来逐个播到 `ended`；
+> 其中 `duration === null` 的那个通常就是还没被激活的第二个视频（见 §0 的多视频说明）。
 
 ## 2. 观察器（每次 1 调用，175 秒）
 
@@ -277,6 +295,11 @@ async (page) => {
 ```
 
 `rows` 里目标节的行尾数字就是剩余任务点；要跑 `toc_status.py` 的数字口径，另存一次 aria 快照：
+
+> **判归零只读 `span.catalog_points_yi`**（完成行整个 span 消失），不要用「行尾有没有数字」判断：
+> 标题自己可能以数字结尾（`6.3.3 激光SLAM-2`），内联正则 `/(\d+)\s*$/` 会把「2」当成剩余 2 点，
+> 凭空造出一个幽灵任务点。`toc_status.py` 的 `TRAILING` 要求数字前有空白，没有这个问题。
+
 
 ```powershell
 python scripts/toc_status.py runs/<task>/toc-after.yml --prefix 1.2

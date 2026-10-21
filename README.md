@@ -40,6 +40,8 @@
 | 学习通 · 丝绸之路上的民族（10 节，A） | 10 节视频（合计 6985.7 s @1x）+ 10 次弹题 + 10 次章节测验；9 节 100 分、3.4 50 分；任务点都 2→0；7 节有 SRT |
 | 学习通 · 丝绸之路 4.3（A）+ 无人驾驶车辆 1.1（C）并发 | 834.1 s @1x + 503.5 s @2x；真实重叠 251.9 s；A 任务点 2→1，C 1→1（2x 视频 ended 但未清）；A 24 次 / 1.08M，C 25 次 / 1.28M；无验证码/多终端 |
 | 学习通 · A 10 节 + C 10 节（<运行日期>） | 20 节视频（合计 9207.5 s）+ 15 次章节测验；13×100 + 2×50；任务点全部清零；20 节点 16.60M token，去掉两个试点异常后 0.53M/节点 |
+| 学习通 · **三门课全量清零（<运行日期> ~ 10-21）** | **157 节 / 283 任务点全部归零**：丝绸之路上的民族 43/43（86 点）、无人驾驶车辆 81/81（164 点）、语言与文化 33/33（33 点，纯测验）。两门视频课 **0.43M token / 10.1 次调用**每节点；纯测验课 **6.5 次调用、40–70 秒**每节；全程无验证码 / 9010 / 多终端 / 日上限 / 登出 |
+| 其中「多视频节」这个坑 | 3 点节点里竖排两个视频，完成条件是「观看时长 ≥ 总时长的 90%」；只播第一个只有 83% / 58%，**永远不计分**。逐个播到 `ended` 后行尾立刻归零 |
 
 - 1.2.1/1.2.2 的只读测验在平台“学习记录 → 章节测验详情”里显示 **已查看**、无分数、不是“已完成”。
 - <运行日期> 用 1.2.3 做只读实测：打开答题页后 `#addTimes=0`、`#limitWorkSubmitTimes=100`，没有提交/start 请求，任务点仍 2；**打开本身没有消耗提交次数**（至少这门课/这个字段语义）。仍会留下“已查看”痕迹；限次=1 的课未单独验证。
@@ -86,6 +88,38 @@ python scripts/check_evidence.py runs/<task>/evidence.json --require-readonly
 python scripts/toc_status.py runs/<task>/toc-before.yml --prefix 1.4
 python scripts/toc_status.py runs/<task>/toc-after.yml --prefix 1.4
 ```
+
+## 从 GitHub 安装（把你的链接 + 下面这段一起发给 DSH）
+
+这个技能不是"点一下自动装"的插件：DSH 的技能发现是读 `<agentsHome>/skills/<name>/SKILL.md`，
+所以安装动作是 **clone → 跑安装脚本 → 重载会话**。把仓库链接和下面这段一起发给你 DSH 里的 agent 即可：
+
+```text
+帮我装一个 DeepSeek Harness 技能，仓库：<在这里粘贴 GitHub 链接>
+
+按顺序做，每步报告结果：
+0. 先自查，再动手：我的工具清单里有没有 mcp__browser__* / mcp__browser2__* / mcp__browser3__* 这类浏览器通道？
+   没有就先别装，先告诉我怎么加一条 Playwright 的 mcp-client —— 这是能不能真跑课的前提，装完没通道只能离线用。
+1. git clone 到临时目录（如 %TEMP%\course-study-dsh），cd 进去；
+2. 确认 python >= 3.10；
+3. 运行 powershell -ExecutionPolicy Bypass -File .\install.ps1
+   （默认装到 %USERPROFILE%\.agents\skills\course-study-dsh）；
+4. 运行 pip install -r requirements.txt；
+5. 在仓库根目录验证，期望 exit 0 且 copies: 1、source_is_installed_copy: false、manifest_drift_files: 0：
+   python .\scripts\dsh_probe.py --agents-home %USERPROFILE%\.agents --require-discovered --require-winner %USERPROFILE%\.agents\skills\course-study-dsh
+6. 重启/重载 DSH 会话，让技能目录刷新；
+7. 汇报：装到哪、探针三个数字、通道结论（有/没有），以及我下一步该怎么配。
+
+装好后我打算用它跑学习通课程。默认是证据模式、不提交测验；需要提交时我会另外明确授权。
+```
+
+两点前提，装之前值得先确认：
+
+- **需要一个浏览器通道**（Playwright MCP 的 `mcp-client` 行，工具前缀 `mcp__browser__*` 之类）。
+  没有通道时本技能**只做离线工作**（读文档、跑脚本、做证据校验），不会去连页面——这是设计上的边界，不是 bug。
+  通道怎么配见 [DSH 运行说明](references/dsh-runtime.md) 的「启用受支持的浏览器通道」。
+- **安装脚本是 PowerShell**（Windows）。仓库里没有 macOS/Linux 的安装器；其他平台只能手工把
+  `SKILL.md`、`references/`、`scripts/`、`tests/` 复制到 `<agentsHome>/skills/course-study-dsh/`。
 
 ## 安装
 

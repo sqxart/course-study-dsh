@@ -19,7 +19,7 @@ BASE = {
     'kind': 'pre-run-evidence',
     'mode': 'evidence',
     'authorization': {'source': 'local/private.toml', 'submit': False, 'redo_once': False},
-    'course': {'title': '地球历史及其生命的奥秘', 'course_id': 260001},
+    'course': {'title': '地球历史及其生命的奥秘', 'course_id': 260000001},
     'section': {'code': '1.2.1', 'title': '示例章节'},
     'video': {
         'duration_seconds': 300.0, 'rate': 1, 'rate_source': 'locked', 'ended': True,
