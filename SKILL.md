@@ -18,6 +18,7 @@ Harness 的通道事实、已实测范围与调用预算在 [DSH 运行说明](r
    | 任务 | 流程 | 平台知识 |
    |---|---|---|
    | 看课、续跑、弹题、章节测验 | [单节点快速配方](references/quickstart.md) → [网课流程](references/course-flow.md) | [学习通](references/chaoxing.md) |
+   | 已提交节点取题库、出复习文档（只读） | [题库与复习文档](references/bank.md) | 结果页明文；正确答案是否可见每课一策 |
    | 摸不清的现象、报错、旧坑 | [现场笔记](references/field-notes.md) | 先查这里再动手 |
    | 两个账号 / 两条浏览器通道 | [多账号运行](references/multi-account.md) | 一个账号一条通道、一个标签 |
    | 有无新课件/测验、截止时间 | 网课流程的列表巡检 | 先停在列表；开始测验是后续独立动作 |
@@ -41,7 +42,8 @@ Harness 的通道事实、已实测范围与调用预算在 [DSH 运行说明](r
 - **弹题不产生任务点**：答对答错都不改变任务点计数，别把弹题当成没完成的那个点。
 - **测验 0 分可能不点亮任务点**：是否点亮看平台标记，不看提交成功。
 - **提交三件事**：等答题帧 `.TiMu` 渲染完再作答（帧 URL 先到、内容后到）；确认框 `#workpop a.jb_btn` 的可见副本在 studentstudy 帧；多选隐藏值存 `ABC`（无逗号），不要按 `A,B,C` 比对。
-- **提交后明文可读**：结果页会显示「我的答案 / 正确答案 / 得分」，字体混淆只在待作答态；用它补题库、做复盘。
+- **提交后明文可读**：结果页会显示「我的答案 / 得分」，字体混淆只在待作答态；用它补题库、做复盘。
+  「正确答案」是否出现由教师决定，实测两门课都没开，所以题库按 `correct: null` 记，不猜（见 [题库与复习文档](references/bank.md)）。
 - **控件有两代**：旧播放器弹题要点 `input[type=radio]`（点 `li` 无效，会提交空答案）；v24 测验页要点 `li[qid]`。进页面先探骨架，别套用上一页的经验。
 - 未满分的章节测验最多重做 1 次（`private.toml` 的 `redo_once`），重走完整流程，直到点亮或余量用尽。
 
@@ -68,6 +70,9 @@ Harness 的通道事实、已实测范围与调用预算在 [DSH 运行说明](r
 - [目录状态](scripts/toc_status.py)：从一次目录快照读出每节的未完成任务点数，`--fail-if-unfinished` 可当验收闸门。
 - [会话成本](scripts/session_cost.py)：读本次会话日志，分开报告输入 / 缓存读 / 输出与每次工具调用的体积，用来核对"每节点 ≤1.5M token"这条线；`--audit-submit` 扫描工具调用里的测验提交选择器。
 - [证据检查](scripts/check_evidence.py)：按 `state.md` 的 evidence 结构核对一次节点记录；证据模式默认要求 `submitted=false`，`--require-readonly` 再加"0 选项点击 / 0 提交点击"。
+- [题库归一化](scripts/quiz_bank.py)：把结果页 capture 校验、合并成 `knowledge/<course>/bank.json` + `bank.md`；`check` 单节自检，`build` 带 `--expected` 报覆盖率缺口。
+- [题库计划](scripts/bank_plan.py)：从 run ledger 取「应该有测验的节号」，从 evidence 补 `work_id`/分数，产出 `expected-*.json` 与 `plan-*.json`。
+- [节点驱动生成](scripts/bank_node_js.py)：把 `references/bank.md` 里的取数驱动实体化成每节一个 JS，交浏览器 `filename` 直载，免去每节点粘贴 4 KB 脚本。
 - [列表采集](scripts/collect_task_list.js) 与 [巡检对比](scripts/inspect_tasks.py)：只读当前已加载列表；`summary`/`diff`。
 - [Harness 探针](scripts/dsh_probe.py)：`--tools` 读当前工具清单，报告技能发现根、安装副本漂移和浏览器候选；`--require-discovered` 扫不到安装副本时 exit 5，`--require-winner <target>` 发现的是别的安装时 exit 6；只读文件系统，不联网、不打开页面。
 - [打包](scripts/package_skill.py)：`export` 生成公开副本，`install` 生成安装副本；都拒绝覆盖已存在的目录。
