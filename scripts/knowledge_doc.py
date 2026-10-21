@@ -90,9 +90,41 @@ def _chapter_label(chapter):
     return chapter.get('label') or chapter.get('code') or ''
 
 
+def _section_key(code):
+    parts = re.findall(r'\d+', str(code))
+    return [int(part) for part in parts] if parts else [0]
+
+
+def merge_outline(bank, notes):
+    """Bank sections plus any note that has no quiz section (video-only nodes).
+
+    题库只收「章节测验」节，视频节的 note 不在 bank 里；知识总结不该因此漏掉它们，
+    所以按节号前缀把它们挂到对应章下；题库里没有的节不写「本节测验 N 题」那行。
+    """
+    chapters, seen = [], set()
+    for chapter in bank['chapters']:
+        sections = []
+        for section in chapter['sections']:
+            sections.append(dict(section))
+            seen.add(section['section'])
+        chapters.append({'label': _chapter_label(chapter), 'sections': sections})
+    for code in sorted((c for c in notes if c not in seen), key=_section_key):
+        prefix = str(code).split('.')[0]
+        target = next((c for c in chapters if str(c['label']).split(' ')[0] == prefix), None)
+        if target is None:
+            target = {'label': prefix, 'sections': []}
+            chapters.append(target)
+        target['sections'].append({'section': code, 'section_title': '', 'questions': []})
+    chapters.sort(key=lambda c: _section_key(str(c['label']).split(' ')[0]))
+    for chapter in chapters:
+        chapter['sections'].sort(key=lambda s: _section_key(s['section']))
+    return chapters
+
+
 def build_knowledge(bank, notes, generated_at=None):
     """Stitch notes under the bank's chapter structure; never fill gaps with quiz text."""
-    sections = [section for chapter in bank['chapters'] for section in chapter['sections']]
+    chapters = merge_outline(bank, notes)
+    sections = [section for chapter in chapters for section in chapter['sections']]
     with_notes = [section for section in sections if section['section'] in notes]
     lines = [
         '# {0} 知识总结'.format(bank.get('course_title') or bank['course']),
@@ -104,8 +136,8 @@ def build_knowledge(bank, notes, generated_at=None):
         '',
         '> 只写视频里讲过的内容：定义、判断依据、易混区别都来自字幕；字幕没讲的（包括平台没开放的正确答案）不补。',
     ]
-    for chapter in bank['chapters']:
-        lines += ['', '## {0}'.format(_chapter_label(chapter)), '']
+    for chapter in chapters:
+        lines += ['', '## {0}'.format(chapter['label']), '']
         for section in chapter['sections']:
             heading = '### {0} {1}'.format(section['section'], section.get('section_title') or '').strip()
             lines.append(heading)
@@ -114,10 +146,11 @@ def build_knowledge(bank, notes, generated_at=None):
             if note:
                 lines.append(note['text'])
             else:
-                lines.append('（本节暂无字幕总结，待补；题目见 bank.md）')
+                lines.append('（本节没有字幕总结：没有视频内容或尚未整理；题目见 `bank.md`）')
             lines.append('')
-            lines.append('> 本节测验 {0} 题，题面与我的答案见 `bank.md`。'.format(len(section['questions'])))
-            lines.append('')
+            if section.get('questions'):
+                lines.append('> 本节测验 {0} 题，题面与我的答案见 `bank.md`。'.format(len(section['questions'])))
+                lines.append('')
     return '\n'.join(lines).rstrip() + '\n'
 
 
@@ -149,7 +182,7 @@ def main(argv=None):
     out = Path(args.out or Path(args.bank).with_name('knowledge.md'))
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(text, encoding='utf-8')
-    total = sum(len(chapter['sections']) for chapter in bank['chapters'])
+    total = sum(len(chapter['sections']) for chapter in merge_outline(bank, notes))
     print('COURSE={0} SECTIONS={1} NOTES={2} MISSING={3} WROTE={4}'.format(
         bank['course'], total, len(notes), total - len(notes), out))
     return 0

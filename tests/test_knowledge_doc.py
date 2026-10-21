@@ -106,7 +106,7 @@ class BuildTest(unittest.TestCase):
         self.assertIn('### 3.1 电子电气架构', text)
         self.assertIn('### 3.2 传感器', text)
         self.assertIn('本节测验 1 题', text)
-        self.assertIn('（本节暂无字幕总结，待补；题目见 bank.md）', text)
+        self.assertIn('（本节没有字幕总结：没有视频内容或尚未整理；题目见 `bank.md`）', text)
 
     def test_header_separates_bank_from_knowledge(self):
         text = knowledge.build_knowledge(bank(), {})
