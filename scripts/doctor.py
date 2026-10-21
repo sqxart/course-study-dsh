@@ -1,4 +1,4 @@
-﻿"""Report this skill's local capabilities without changing the environment."""
+"""Report this skill's local capabilities without changing the environment."""
 import importlib.util
 import json
 from pathlib import Path

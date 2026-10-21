@@ -1,4 +1,4 @@
-﻿"""Build an independent install or a public export; never touches old skills."""
+"""Build an independent install or a public export; never touches old skills."""
 import argparse
 import hashlib
 import json
