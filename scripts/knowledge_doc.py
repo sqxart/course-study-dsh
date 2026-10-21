@@ -23,6 +23,9 @@ REQUIRED_SECTIONS = ('考点知识', '概念表')
 FORBIDDEN_SECTIONS = ('本节讲什么', '本节结论', '要点')
 DEPRECATED_MARKERS = ('【单选题】', '【多选题】', '【判断题】', '我的答案：', '正确答案：')
 BANK_MARKERS = DEPRECATED_MARKERS
+# The user's rule: examples go, even when they support a point. These are the markers that
+# introduce one, so a note that still narrates an example fails instead of shipping.
+EXAMPLE_MARKERS = ('比如', '例如', '举例', '譬如', '有一回', '曾经有', '我记得')
 MIN_POINTS = 8
 MIN_CHARS = 300
 _CLOCK = r'\d{1,2}:\d{2}(?::\d{2})?'
@@ -60,6 +63,10 @@ def validate_note(text):
         problems.append('only {0} knowledge bullets, need {1}'.format(points, MIN_POINTS))
     if timestamps:
         problems.append('timestamps are not wanted in a review card: drop the (00:00) markers')
+    for marker in EXAMPLE_MARKERS:
+        if marker in body:
+            problems.append('examples are not wanted: remove the "{0}" passage'.format(marker))
+            break
     if chars < MIN_CHARS:
         problems.append('only {0} chars, need {1}'.format(chars, MIN_CHARS))
     return problems, {'points': points, 'timestamps': timestamps, 'chars': chars}

@@ -84,6 +84,11 @@ class ValidateTest(unittest.TestCase):
         self.assertEqual(problems, ['note is empty'])
         self.assertEqual(stats, {})
 
+    def test_examples_are_rejected(self):
+        text = GOOD_NOTE.replace('- 外部性：一些人使用资源', '- 外部性是成本转嫁，比如工厂排污。\n- 外部性：一些人使用资源')
+        problems, _ = knowledge.validate_note(text)
+        self.assertTrue(any('examples are not wanted' in p for p in problems))
+
     def test_time_ranges_count_as_anchors(self):
         # The review card must not carry a timeline at all.
         text = GOOD_NOTE.replace('- 公地的悲剧：公共资源', '- 公地的悲剧（00:01:17）：公共资源')
