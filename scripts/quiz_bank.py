@@ -223,6 +223,12 @@ def _answer_cell(question):
     return '未提供（平台未开放正确答案）'
 
 
+def _correct_option_keys(question):
+    """Option letters the platform marked correct, so the reader can see the tick in place."""
+    keys = {option.get('key') for option in question.get('options') or []}
+    return {char for char in (question.get('correct') or '').upper() if char in keys}
+
+
 def _my_answer_line(question):
     """Only shown when the platform hid the key: then the answer chosen is the only clue."""
     if question['correct']:
@@ -272,14 +278,14 @@ def render_bank_markdown(bank):
             lines.append('')
             for question in section['questions']:
                 lines.append('{0}. {1}{2}'.format(question['idx'], question['type_label'] or '', question['stem']))
+                marked = _correct_option_keys(question)
                 for option in question['options']:
-                    lines.append('   - {0}、{1}'.format(option['key'], option['text']))
+                    tick = ' ✓' if option['key'] in marked else ''
+                    lines.append('   - {0}、{1}{2}'.format(option['key'], option['text'], tick))
                 lines.append('   - 正确答案：{0}'.format(_answer_cell(question)))
                 mine = _my_answer_line(question)
                 if mine:
                     lines.append('   - ' + mine)
-                if question['qid']:
-                    lines.append('   - 题号：{0}'.format(question['qid']))
                 lines.append('')
     return '\n'.join(lines).rstrip() + '\n'
 

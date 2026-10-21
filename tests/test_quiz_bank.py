@@ -158,6 +158,7 @@ class RenderTest(unittest.TestCase):
         self.assertIn('未提供（平台未开放正确答案）', text)
         self.assertIn('## 1 测试章', text)
         self.assertIn('### 1.1 测试节', text)
+        self.assertNotIn('题号：', text)
 
     def test_markdown_flags_page_supplied_answers(self):
         built = bank.build_bank([bank.normalize_capture(capture(
@@ -167,6 +168,19 @@ class RenderTest(unittest.TestCase):
         text = bank.render_bank_markdown(built)
         self.assertIn('B（结果页给出）', text)
         self.assertNotIn('正确答案键不可用', text)
+        # The tick sits on the correct option itself, and only there.
+        self.assertIn('   - B、选项乙 ✓', text)
+        self.assertNotIn('选项甲 ✓', text)
+        self.assertNotIn('题号：', text)
+        # Multi-select: every correct option gets its own tick.
+        multi = bank.build_bank([bank.normalize_capture(capture(
+            answer_visible=True, meta={'question_count': 1, 'full_score': 100, 'attempt': 1,
+                                       'total_score': 100},
+            questions=[question(qtype_text='【多选题】', correct='AB', score=100,
+                                mark='marking_dui')]))], course='demo')
+        multi_text = bank.render_bank_markdown(multi)
+        self.assertIn('   - A、选项甲 ✓', multi_text)
+        self.assertIn('   - B、选项乙 ✓', multi_text)
 
 
 class CheckCaptureTest(unittest.TestCase):
