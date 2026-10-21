@@ -81,8 +81,10 @@ Harness 的通道事实、已实测范围与调用预算在 [DSH 运行说明](r
 - [文本留存](scripts/media_keep.py)：看完一个视频节后，把 `evidence.json` 里的 `subs`（或签名 `mp4`）落成
   `subs/<course>/<节>.srt`；没有字幕且 `[asr] enabled` 时才转写成 `asr/<course>/<节>.txt`。
   功能 1/2 顺手调用，功能 4 直接复用，**同一节课的字幕不重复抓、转写不重复付费**。
-- [无字幕转写](scripts/asr_mimo.py)：无字幕视频用 MiMo ASR 转写（签名直链 mp4 + ffmpeg + 90 秒分块），
-  可在播放的同时并行转写；受 `local/private.toml` 的 `[asr] enabled` 开关控制，关掉就回退旧流程。
+- [无字幕转写](scripts/asr_mimo.py)：无字幕视频用 ASR 转写（签名直链 mp4 + ffmpeg + 90 秒分块），
+  可在播放的同时并行转写；受 `local/private.toml` 的 `[asr] enabled` 开关控制（默认关），关掉就回退旧流程。
+  默认提供方是 MiMo，但 `--endpoint/--model/--auth-style/--provider-key-env` 可换成任意 OpenAI 兼容端点，
+  本地 faster-whisper 转写也能直接喂（只认 `asr/<节>.txt` 这个结果文件）。安装、免费路线与排错见 [ASR 说明](references/asr.md)。
 - [知识总结拼装](scripts/knowledge_doc.py)：校验每节 note（要点条数/时间戳/不许抄题/不许事务占位），按章拼成 `knowledge.md`；`build` 缺节会点名。
 - [列表采集](scripts/collect_task_list.js) 与 [巡检对比](scripts/inspect_tasks.py)：只读当前已加载列表；`summary`/`diff`。
 - [Harness 探针](scripts/dsh_probe.py)：`--tools` 读当前工具清单，报告技能发现根、安装副本漂移和浏览器候选；`--require-discovered` 扫不到安装副本时 exit 5，`--require-winner <target>` 发现的是别的安装时 exit 6；只读文件系统，不联网、不打开页面。

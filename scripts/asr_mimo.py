@@ -1,15 +1,23 @@
-"""Transcribe a course video (or a local audio file) with MiMo ASR.
+"""Transcribe a course video (or a local audio file) with an OpenAI-compatible ASR endpoint.
 
-MiMo exposes ASR through an OpenAI-compatible chat completion:
+The default provider is MiMo, which exposes ASR through a chat completion:
 `POST https://api.xiaomimimo.com/v1/chat/completions` with `model=mimo-v2.5-asr`
 and one `input_audio` part carrying base64 mp3/wav. Auth is the `api-key` header.
+
+The endpoint is not MiMo-specific: any service that accepts the same `input_audio`
+chat payload works — point `--endpoint` / `--model` at it, and use `--auth-style bearer`
+when it wants `Authorization: Bearer <key>` instead of the `api-key` header.
 
 The course player serves a signed direct MP4 (`s2.cldisk.com/.../sd.mp4?at_=...`), so the
 pipeline is: download → ffmpeg to 16 kHz mono mp3 → chunk → base64 per chunk → transcript.
 
     python scripts/asr_mimo.py --source "<signed mp4 url>" --out runs/<task>/asr/2.1.txt
+    python scripts/asr_mimo.py --source "<mp4>" --out out.txt `
+        --endpoint https://api.groq.com/openai/v1/chat/completions `
+        --model whisper-large-v3-turbo --auth-style bearer --provider-key-env GROQ_API_KEY
 
-The API key is read from $MIMO_API_KEY or --key-file (default `local/mimo.key`); it is never
+The API key is read from `--api-key`, then `$MIMO_API_KEY` / `$ASR_API_KEY` / the provider
+env named by `--provider-key-env`, then `--key-file` (default `local/mimo.key`); it is never
 written into the transcript or the log.
 """
 
@@ -29,6 +37,7 @@ ENDPOINT = 'https://api.xiaomimimo.com/v1/chat/completions'
 MODEL = 'mimo-v2.5-asr'
 DEFAULT_KEY_FILE = Path(__file__).resolve().parents[1] / 'local' / 'mimo.key'
 PRIVATE_CONFIG = Path(__file__).resolve().parents[1] / 'local' / 'private.toml'
+KEY_ENV_VARS = ('MIMO_API_KEY', 'ASR_API_KEY')
 
 
 def asr_enabled():
@@ -57,13 +66,33 @@ def find_tool(name):
 def read_key(args):
     if args.api_key:
         return args.api_key.strip()
-    env = os.environ.get('MIMO_API_KEY')
-    if env:
-        return env.strip()
+    candidates = list(KEY_ENV_VARS)
+    provider_env = getattr(args, 'provider_key_env', None)
+    if provider_env:
+        candidates.insert(0, provider_env)
+    for name in candidates:
+        value = os.environ.get(name)
+        if value:
+            return value.strip()
     path = Path(args.key_file)
     if path.is_file():
         return path.read_text(encoding='utf-8').strip()
-    raise SystemExit('no API key: set MIMO_API_KEY or write ' + str(path))
+    raise SystemExit('no API key: set {0}, or write {1}'.format(' or '.join(candidates), path))
+
+
+def private_asr(section):
+    """`[asr]` table from local/private.toml, so a default can live in config instead of flags."""
+    try:
+        import tomllib
+    except ImportError:
+        return {}
+    if not PRIVATE_CONFIG.is_file():
+        return {}
+    try:
+        payload = tomllib.loads(PRIVATE_CONFIG.read_text(encoding='utf-8'))
+    except Exception:                       # noqa: BLE001 - a broken config is reported elsewhere
+        return {}
+    return payload.get(section) or {}
 
 
 def fetch(url, target, timeout=600, referer='https://mooc1.chaoxing.com/', attempts=8):
@@ -138,9 +167,10 @@ def probe_duration(ffmpeg, audio):
         return 0.0
 
 
-def transcribe(key, audio_path, language='zh', timeout=300):
+def transcribe(key, audio_path, language='zh', timeout=300, endpoint=None, model=None,
+               auth_style='api-key'):
     payload = {
-        'model': MODEL,
+        'model': model or MODEL,
         'messages': [{
             'role': 'user',
             'content': [{
@@ -155,8 +185,12 @@ def transcribe(key, audio_path, language='zh', timeout=300):
         'asr_options': {'language': language},
     }
     body = json.dumps(payload).encode('utf-8')
-    request = urllib.request.Request(ENDPOINT, data=body, method='POST', headers={
-        'Content-Type': 'application/json', 'api-key': key})
+    headers = {'Content-Type': 'application/json'}
+    if auth_style == 'bearer':
+        headers['Authorization'] = 'Bearer ' + key
+    else:
+        headers['api-key'] = key
+    request = urllib.request.Request(endpoint or ENDPOINT, data=body, method='POST', headers=headers)
     with urllib.request.urlopen(request, timeout=timeout) as response:
         data = json.loads(response.read().decode('utf-8'))
     text = data['choices'][0]['message']['content']
@@ -170,12 +204,24 @@ def main(argv=None):
     parser.add_argument('--out', required=True, help='Transcript path (.txt)')
     parser.add_argument('--chunk-seconds', type=float, default=600, help='Chunk length (default 600)')
     parser.add_argument('--language', default='zh', choices=('zh', 'en', 'auto'))
-    parser.add_argument('--api-key', help='MiMo API key (else $MIMO_API_KEY or key file)')
+    parser.add_argument('--api-key', help='API key (else env MIMO_API_KEY/ASR_API_KEY or key file)')
     parser.add_argument('--key-file', default=str(DEFAULT_KEY_FILE))
+    parser.add_argument('--provider-key-env', help='Extra env var to read the key from, e.g. GROQ_API_KEY')
+    parser.add_argument('--endpoint', help='OpenAI-compatible chat-completions URL (default: MiMo)')
+    parser.add_argument('--model', help='ASR model name (default: mimo-v2.5-asr)')
+    parser.add_argument('--auth-style', default='api-key', choices=('api-key', 'bearer'),
+                        help='api-key header (MiMo) or Authorization: Bearer (most other providers)')
     parser.add_argument('--keep-audio', action='store_true', help='Keep the intermediate mp3 chunks')
     parser.add_argument('--force', action='store_true',
                         help='Run even when local/private.toml has [asr] enabled = false')
     args = parser.parse_args(argv)
+
+    config = private_asr('asr')
+    args.endpoint = args.endpoint or config.get('endpoint')
+    args.model = args.model or config.get('model')
+    args.auth_style = args.auth_style if args.auth_style != 'api-key' else (config.get('auth_style') or 'api-key')
+    if args.key_file == str(DEFAULT_KEY_FILE) and config.get('key_file'):
+        args.key_file = config['key_file']
 
     enabled, why = asr_enabled()
     if enabled is False and not args.force:
@@ -205,7 +251,8 @@ def main(argv=None):
         print('DURATION {0:.1f}s CHUNKS {1}'.format(duration, len(pieces)), file=sys.stderr)
         texts, seconds = [], 0
         for index, (path, start) in enumerate(pieces):
-            text, usage = transcribe(key, path, args.language)
+            text, usage = transcribe(key, path, args.language, endpoint=args.endpoint,
+                                     model=args.model, auth_style=args.auth_style)
             texts.append(text)
             seconds += usage.get('seconds') or 0
             print('CHUNK {0}/{1} at {2:.0f}s chars={3} billed_seconds={4}'.format(

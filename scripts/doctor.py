@@ -34,7 +34,7 @@ def main():
         'scripts/toc_status.py', 'scripts/session_cost.py', 'scripts/check_evidence.py',
         'scripts/question_reader.py', 'scripts/quiz_ocr.py', 'scripts/subtitle_evidence.py')}
     result = {
-        'skill': 'course-study-dsh', 'version': '1.0.13',
+        'skill': 'course-study-dsh', 'version': '1.0.14',
         'python': {'path': sys.executable, 'version': sys.version.split()[0]},
         'node': version('node'),
         'reader': question_reader.doctor(),

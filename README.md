@@ -4,6 +4,54 @@
 
 不刷倍数、不伪造心跳、不碰上报接口。倍速优先用平台播放器菜单里给的那几档；属性写入只作退路，且必须读回。
 
+## 装上之后：能直接用吗？
+
+**主链路不需要任何 API key。** 但有几项能力是「作者本机刚好有、别人不一定有」的，缺了不会崩，只会降级——
+先看这张表，能省掉大半「为什么我这里不对」：
+
+| 能力 | 需要什么 | 缺了会怎样 | 是否必需 |
+|---|---|---|---|
+| 打开课程、看视频、答弹题、交测验 | DeepSeek Harness + 一条 `mcp-browser*` 通道 + 你自己的学习通登录态 | 什么都做不了 | **必需** |
+| 取题库、写复习卡、拼文档 | Python 3.10+（标准库即可） | 跑不了脚本 | **必需** |
+| 截图 OCR 读题（`quiz_ocr.py`） | `pip install -r requirements-ocr.txt`（Pillow / fonttools / rapidocr / onnxruntime） | 改用模型读保存下来的截图，或走 DOM 明文 | 可选 |
+| 无字幕转写（`asr_mimo.py`） | `ffmpeg` + `ffprobe` + 一个 ASR 服务 key + `[asr] enabled = true` | 无字幕课退回「学科判断 + low_confidence」，复习卡跳过该节 | 可选，**默认关闭** |
+| 外部题库比对（`bank_crosscheck.py`） | `pip install pymupdf` | 跳过比对，题库只用平台原文 | 可选 |
+| 会话成本报告（`session_cost.py`） | `pip install -r requirements.txt`（zstandard） | 只是没有成本报表 | 可选 |
+| 测试（`pytest tests`） | Node.js（`node --check` 校验文档里的 JS 片段） | 相关用例 skip，其余照跑 | 可选 |
+
+装完先自检：
+
+```powershell
+python scripts/doctor.py                     # Python/Node/OCR/字体 一次看清
+powershell -ExecutionPolicy Bypass -File .\install.ps1   # 装到 ~/.agents/skills/course-study-dsh
+```
+
+`install.ps1` 会把 `private.toml.example` 复制成 `local/private.toml`——**公开默认是证据模式、不提交**；
+要让它真的提交，必须由账号本人在那份配置里显式打开 `submit = true`。`local/`、`runs/`、`knowledge/` 都在 `.gitignore` 里，不随仓库走。
+
+## ASR（无字幕转写）：默认关闭，按需开启
+
+只有「这节课没有字幕、你又想按老师原话答题/写复习卡」时才需要它。三个条件缺一不可：
+`ffmpeg` 在 PATH、有 ASR 服务的 key、`local/private.toml` 里 `[asr] enabled = true`。
+
+默认走 MiMo（`mimo-v2.5-asr`，OpenAI 兼容的 `input_audio` 负载）；作者实测 30 分钟视频约 <时长>秒转完、约 0.5 元/小时音频：
+
+> 我在用 MiMo 开放平台，体验小米顶尖模型 MiMo V2.6 等。通过我的邀请码注册：双方各得 ¥10 API 体验金 + 首单 9 折。
+> 邀请码：**KQDN7K**。注册：<https://platform.xiaomimimo.com?ref=KQDN7K>（注册后自动填入 · 体验金 40 天有效）
+
+（邀请码是作者的分成链接；不想用可以直接搜官网自己注册，脚本不绑定任何邀请关系。）
+
+**不锁定这家**：脚本接受任何同形态的 OpenAI 兼容端点，换服务只是几个参数的事——
+
+```powershell
+python scripts/asr_mimo.py --source "<签名 mp4>" --out runs/asr/2.1.txt `
+  --endpoint https://api.groq.com/openai/v1/chat/completions `
+  --model whisper-large-v3-turbo --auth-style bearer --provider-key-env GROQ_API_KEY
+```
+
+不想联网就在本地转写（faster-whisper / whisper.cpp），结果丢进 `runs/<task>/asr/<节>.txt`，技能照样认。
+常见免费路线、成本、排错表与本地做法见 [ASR 说明](references/asr.md)。
+
 ## 它做什么
 
 - 打开学习通课程目录，按平台允许的最高倍速静音播放，直到视频结束。

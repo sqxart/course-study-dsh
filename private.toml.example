@@ -31,12 +31,26 @@ redo_once = false
 # the lecture's own words. Works on an uncompleted node: the player exposes a signed mp4
 # as soon as the page loads, so nothing has to be watched first, and it can run while the
 # video plays.
-#   true  = no subtitles -> MiMo ASR transcription -> answer with the transcript
+#   true  = no subtitles -> ASR transcription -> answer with the transcript
 #   false = old behaviour: no subtitles -> subject-knowledge inference (low confidence),
 #           and sections without subtitles are skipped in the knowledge document
+#
+# Optional: the rest of the skill works without it. Enabling needs all three of
+#   1) ffmpeg + ffprobe on PATH
+#   2) an API key: local/mimo.key, $MIMO_API_KEY, $ASR_API_KEY, or --provider-key-env
+#   3) this switch set to true
+# The default provider is MiMo (model mimo-v2.5-asr). Any OpenAI-compatible endpoint that
+# accepts the same `input_audio` chat payload works; free/local routes are in references/asr.md.
+# MiMo invite (author's referral link, entirely optional): code KQDN7K
+#   https://platform.xiaomimimo.com?ref=KQDN7K  -> both sides get ¥10 credit + 10% off the first order
 enabled = false
 # 600-second chunks made the model repeat one paragraph; 90 seconds is the tested value.
 chunk_seconds = 90
+# Leave the four below commented to use the MiMo defaults.
+# endpoint = "https://api.xiaomimimo.com/v1/chat/completions"
+# model = "mimo-v2.5-asr"
+# auth_style = "api-key"          # "bearer" for most other providers
+# key_file = "local/mimo.key"
 
 [limits]
 # Advisory budget, not a code gate: the executor records the call count in
