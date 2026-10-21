@@ -4,6 +4,7 @@ local/
 runs/
 profiles/
 _validation/
+knowledge/
 dist/
 node_modules/
 __pycache__/
