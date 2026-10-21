@@ -75,7 +75,10 @@ Harness 的通道事实、已实测范围与调用预算在 [DSH 运行说明](r
 - [目录状态](scripts/toc_status.py)：从一次目录快照读出每节的未完成任务点数，`--fail-if-unfinished` 可当验收闸门。
 - [会话成本](scripts/session_cost.py)：读本次会话日志，分开报告输入 / 缓存读 / 输出与每次工具调用的体积，用来核对"每节点 ≤1.5M token"这条线；`--audit-submit` 扫描工具调用里的测验提交选择器。
 - [证据检查](scripts/check_evidence.py)：按 `state.md` 的 evidence 结构核对一次节点记录；证据模式默认要求 `submitted=false`，`--require-readonly` 再加"0 选项点击 / 0 提交点击"。
-- [题库归一化](scripts/quiz_bank.py)：把结果页 capture 校验、合并成 `knowledge/<course>/bank.json` + `bank.md`；`check` 单节自检，`build` 带 `--expected` 报覆盖率缺口。
+- [题库归一化](scripts/quiz_bank.py)：把结果页 capture 校验、合并成 `knowledge/<course>/bank.json` + `bank.md`；`check` 单节自检，`build` 带 `--expected` 报覆盖率缺口，`--popquiz-index` 给每节加一行指向 `popquiz.md`。
+- [弹题库归一化](scripts/popquiz_bank.py)：把**播放中弹题** capture 校验、按节聚合成 `knowledge/<course>/popquiz.{json,md}`；
+  `check` 单条自检，`build` 带 `--index-out`。弹题与章节测验**不混表**：`bank.md` 只加一行索引。
+  平台不公布弹题正确答案，`revealed_correct` 留空、不猜；verdict 只按「浮层是否关闭」判（答错不关）。
 - [题库计划](scripts/bank_plan.py)：从 run ledger 取「应该有测验的节号」，从 evidence 补 `work_id`/分数，产出 `expected-*.json` 与 `plan-*.json`。
 - [节点驱动生成](scripts/bank_node_js.py)：把 `references/bank.md` 里的取数驱动实体化成每节一个 JS，交浏览器 `filename` 直载，免去每节点粘贴 4 KB 脚本。
 - [字幕抓取](scripts/bank_subs.py)：按 capture 里记下的字幕地址批量下载 SRT，供知识总结使用。

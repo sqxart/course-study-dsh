@@ -163,9 +163,18 @@ def sort_key(section):
     return [int(part) for part in re.findall(r'\d+', str(section))]
 
 
-def build_bank(nodes, course, course_title=None, expected=None, generated_at=None, external=None):
-    """Merge node records into one bank. `expected` names sections that should exist."""
+def build_bank(nodes, course, course_title=None, expected=None, generated_at=None, external=None, popquiz=None):
+    """Merge node records into one bank. `expected` names sections that should exist.
+
+    `popquiz` maps a section code to its popup-quiz count; the popups themselves live in
+    `popquiz.md` (see scripts/popquiz_bank.py), so the bank only carries the count.
+    """
     nodes = sorted(nodes, key=lambda node: sort_key(node['section']))
+    if popquiz:
+        for node in nodes:
+            count = int(popquiz.get(node['section']) or 0)
+            if count:
+                node['popup_count'] = count
     if external:
         for node in nodes:
             section_external = external.get(node['section']) or {}
@@ -294,6 +303,9 @@ def render_bank_markdown(bank):
                 section['work_id'] or '?', section['total_score'],
                 section['full_score'], section['attempt'] or '?'))
             lines.append('')
+            if section.get('popup_count'):
+                lines.append('- 本节另有弹题 {0} 题，见 `popquiz.md`（平台未公布正确答案）'.format(section['popup_count']))
+                lines.append('')
             for question in section['questions']:
                 lines.append('{0}. {1}{2}'.format(question['idx'], question['type_label'] or '', question['stem']))
                 marked = _correct_option_keys(question)
@@ -391,6 +403,8 @@ def main(argv=None):
     build.add_argument('--expected', help='JSON file with the section codes that should exist')
     build.add_argument('--external-answers',
                        help='JSON from bank_crosscheck.py --external-out: hints for questions the platform left blank')
+    build.add_argument('--popquiz-index',
+                       help='JSON {section: count} from popquiz_bank.py --index-out: add one pointer line per section')
     build.add_argument('--out', help='bank.json path (default knowledge/<course>/bank.json)')
     build.add_argument('--md', help='bank.md path (default knowledge/<course>/bank.md)')
     build.add_argument('--json', action='store_true', help='Print the bank instead of the brief')
@@ -443,6 +457,9 @@ def main(argv=None):
     external = None
     if args.external_answers:
         external = json.loads(Path(args.external_answers).read_text(encoding='utf-8'))
+    popquiz = None
+    if args.popquiz_index:
+        popquiz = json.loads(Path(args.popquiz_index).read_text(encoding='utf-8'))
     nodes, skipped = load_captures(args.nodes)
     for line in skipped:
         print('SKIP ' + line, file=sys.stderr)
@@ -450,7 +467,7 @@ def main(argv=None):
         print('no captures in ' + args.nodes, file=sys.stderr)
         return EXIT_EMPTY
     bank = build_bank(nodes, course=args.course, course_title=args.title, expected=expected,
-                      external=external)
+                      external=external, popquiz=popquiz)
     out = Path(args.out or Path('knowledge') / args.course / 'bank.json')
     md = Path(args.md or Path('knowledge') / args.course / 'bank.md')
     out.parent.mkdir(parents=True, exist_ok=True)

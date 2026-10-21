@@ -266,6 +266,26 @@ python scripts/quiz_bank.py build --nodes … --course <course> --expected … `
 - 先看 `PDF records / agree / disagree` 三个数；PDF 可能漏选项或与平台结果冲突，只能当线索。
 - 外部题库未覆盖的课程遇到空答案时留空并如实标注；目录名和位置由使用者自己给。
 
+### 2.2 弹题（课中浮层）单独成表，不混进章节测验
+
+视频播放中弹出的弹题是**另一类证据**：它不产生任务点、平台也不公布正确答案，
+所以既不能塞进 `bank.json`，也不能当作「已答对」的凭证。
+
+```powershell
+python scripts/popquiz_bank.py check runs/<task>/popquiz/<course>/<节>-0.json
+python scripts/popquiz_bank.py build --popquiz-dir runs/<task>/popquiz/<course> `
+  --course <course> --title 示例课程2 --index-out runs/<task>/popquiz-index-<course>.json
+python scripts/quiz_bank.py build --nodes … --course <course> --popquiz-index runs/<task>/popquiz-index-<course>.json
+```
+
+- 产出 `knowledge/<course>/popquiz.{json,md}`；`bank.md` 里每节**只加一行**「本节另有弹题 N 题，见 `popquiz.md`」。
+- capture 一条一个文件（`<节>-<序号>.json`），字段见 `modes.md`／本文件 §3 的 `video-quiz-capture`。
+- **平台不公布弹题答案**：`revealed_correct` 一律 `null`，不猜；`verdict` 只能按「浮层是否关闭」判
+  （旧播放器答错不关、答对才关），并在 `note` 里写清依据。
+- 旧播放器的弹题是**明文 DOM**（`.ans-videoquiz` / `li.ans-videoquiz-opt`），不用截图 OCR；
+  判断题的选项写 `[{"key":"对"},{"key":"错"}]`，`qtype=judge`。
+- 已完成节点不会再触发弹题：**没有历史留存的节直接跳过**，报告里写明「本节弹题无法回溯」。
+
 ## 3. 字段口径（bank.json）
 
 | 字段 | 含义 |
