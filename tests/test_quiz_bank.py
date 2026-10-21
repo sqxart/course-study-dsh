@@ -181,6 +181,12 @@ class RenderTest(unittest.TestCase):
         multi_text = bank.render_bank_markdown(multi)
         self.assertIn('   - A、选项甲 ✓', multi_text)
         self.assertIn('   - B、选项乙 ✓', multi_text)
+        # An outside key only shows up where the platform gave nothing, and says so.
+        hinted = bank.build_bank([bank.normalize_capture(capture())], course='demo',
+                                 external={'1.1': {'2': {'answer': 'ABD', 'source': '尔雅题库 测试'}}})
+        hinted_text = bank.render_bank_markdown(hinted)
+        self.assertIn('外部题库参考：ABD（尔雅题库 测试，非平台答案，谨慎采用）', hinted_text)
+        self.assertNotIn('外部题库参考', text)
 
 
 class CheckCaptureTest(unittest.TestCase):

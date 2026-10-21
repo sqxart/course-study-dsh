@@ -45,8 +45,9 @@
 
 ## 2. 调用方式（一节一个 agent，可并行）
 
-- 字幕：`runs/<task>/subs/<course>/<section>.srt`；无字幕且 `[asr] enabled = true` 时用
-  `scripts/asr_mimo.py --chunk-seconds 90` 转写（见 §3）。
+- 字幕：先看 `runs/<task>/subs/<course>/<section>.srt` 有没有现成文件（功能 1/2 会顺手存），
+  没有再取；无字幕且 `[asr] enabled = true` 时用 `scripts/asr_mimo.py --chunk-seconds 90` 转写（见 §3）。
+  两者都没有才回节点取 `allsubtitle`——**不要为了字幕再刷一遍视频**。
 - 该节题目（只用于定位考点，**不许抄进产出**）：
   `python scripts/quiz_bank.py section --bank knowledge/<course>/bank.json --code <section>`。
 - 产出：`runs/<task>/notes/<course>/<section>.md`，写完跑

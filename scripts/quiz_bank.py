@@ -163,9 +163,16 @@ def sort_key(section):
     return [int(part) for part in re.findall(r'\d+', str(section))]
 
 
-def build_bank(nodes, course, course_title=None, expected=None, generated_at=None):
+def build_bank(nodes, course, course_title=None, expected=None, generated_at=None, external=None):
     """Merge node records into one bank. `expected` names sections that should exist."""
     nodes = sorted(nodes, key=lambda node: sort_key(node['section']))
+    if external:
+        for node in nodes:
+            section_external = external.get(node['section']) or {}
+            for question in node['questions']:
+                candidate = section_external.get(str(question['idx']))
+                if candidate:
+                    question['external'] = candidate
     chapters = []
     for node in nodes:
         label = node.get('chapter') or node['section'].split('.')[0]
@@ -229,6 +236,17 @@ def _correct_option_keys(question):
     return {char for char in (question.get('correct') or '').upper() if char in keys}
 
 
+def _external_line(question):
+    """A key from an outside answer bank: shown only when the platform gave nothing."""
+    if question.get('correct'):
+        return None
+    external = question.get('external') or {}
+    if not external.get('answer'):
+        return None
+    return '外部题库参考：{0}（{1}，非平台答案，谨慎采用）'.format(
+        external['answer'], external.get('source') or '外部题库')
+
+
 def _my_answer_line(question):
     """Only shown when the platform hid the key: then the answer chosen is the only clue."""
     if question['correct']:
@@ -286,6 +304,9 @@ def render_bank_markdown(bank):
                 mine = _my_answer_line(question)
                 if mine:
                     lines.append('   - ' + mine)
+                outside = _external_line(question)
+                if outside:
+                    lines.append('   - ' + outside)
                 lines.append('')
     return '\n'.join(lines).rstrip() + '\n'
 
@@ -368,6 +389,8 @@ def main(argv=None):
     build.add_argument('--course', required=True, help='Course key, e.g. course-example')
     build.add_argument('--title', help='Course title for the markdown header')
     build.add_argument('--expected', help='JSON file with the section codes that should exist')
+    build.add_argument('--external-answers',
+                       help='JSON from bank_crosscheck.py --external-out: hints for questions the platform left blank')
     build.add_argument('--out', help='bank.json path (default knowledge/<course>/bank.json)')
     build.add_argument('--md', help='bank.md path (default knowledge/<course>/bank.md)')
     build.add_argument('--json', action='store_true', help='Print the bank instead of the brief')
@@ -417,13 +440,17 @@ def main(argv=None):
     expected = None
     if args.expected:
         expected = json.loads(Path(args.expected).read_text(encoding='utf-8'))
+    external = None
+    if args.external_answers:
+        external = json.loads(Path(args.external_answers).read_text(encoding='utf-8'))
     nodes, skipped = load_captures(args.nodes)
     for line in skipped:
         print('SKIP ' + line, file=sys.stderr)
     if not nodes:
         print('no captures in ' + args.nodes, file=sys.stderr)
         return EXIT_EMPTY
-    bank = build_bank(nodes, course=args.course, course_title=args.title, expected=expected)
+    bank = build_bank(nodes, course=args.course, course_title=args.title, expected=expected,
+                      external=external)
     out = Path(args.out or Path('knowledge') / args.course / 'bank.json')
     md = Path(args.md or Path('knowledge') / args.course / 'bank.md')
     out.parent.mkdir(parents=True, exist_ok=True)

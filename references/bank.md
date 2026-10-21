@@ -75,14 +75,17 @@ async (page) => {
   const study = page.frames().find((f) => f.url().includes('studentstudy'));
   if (!study) return { ok: false, reason: 'no-studentstudy-frame', course: COURSE, section: SECTION, row: before };
 
-  // 顺手记下播放器的字幕清单（复习文档用）；读不到就留空，绝不因此中断取题。
+  // 顺手记下播放器的字幕清单与签名 mp4（复习文档用，media_keep.py 会接手）；读不到就留空，绝不因此中断取题。
   let subs = { allsubtitle: null, srt: [], error: null };
+  let media = { mp4: [] };
   try {
     const vf = page.frames().find((f) => f.url().includes('ananas/modules/video'));
     if (vf) {
-      subs = await vf.evaluate(async () => {
-        const url = performance.getEntriesByType('resource').map((e) => e.name).find((u) => u.includes('allsubtitle'));
-        if (!url) return { allsubtitle: null, srt: [], error: 'no-allsubtitle-request' };
+      const info = await vf.evaluate(async () => {
+        const resources = performance.getEntriesByType('resource').map((e) => e.name);
+        const mp4 = [...new Set(resources.filter((u) => /\.mp4(\?|$)/i.test(u)))].slice(0, 4);
+        const url = resources.find((u) => u.includes('allsubtitle'));
+        if (!url) return { allsubtitle: null, srt: [], error: 'no-allsubtitle-request', mp4 };
         try {
           const list = await Promise.race([
             fetch(url, { credentials: 'include' }).then((r) => r.json()),
@@ -94,9 +97,11 @@ async (page) => {
             else if (n && typeof n === 'object') Object.values(n).forEach(walk);
           };
           walk(list);
-          return { allsubtitle: url, srt: [...new Set(srt)], error: null };
-        } catch (e) { return { allsubtitle: url, srt: [], error: String(e).slice(0, 80) }; }
+          return { allsubtitle: url, srt: [...new Set(srt)], error: null, mp4 };
+        } catch (e) { return { allsubtitle: url, srt: [], error: String(e).slice(0, 80), mp4 }; }
       });
+      subs = { allsubtitle: info.allsubtitle, srt: info.srt, error: info.error };
+      media = { mp4: info.mp4 || [] };
     }
   } catch (e) { subs = { allsubtitle: null, srt: [], error: String(e).slice(0, 80) }; }
 
@@ -204,6 +209,7 @@ async (page) => {
     toc: { before, after, changed: !!after && (after.t !== before.t || after.p.join() !== before.p.join()) },
     body_head: data.body_head,
     subs,
+    media,
     went_back: wentBack,
     elapsed_ms: Date.now() - t0,
     captured_at: new Date().toISOString()
@@ -241,6 +247,25 @@ python scripts/quiz_bank.py build --nodes runs/<task>/nodes/example-course `
   判断题没有选项，仍用「正确答案：对/错」行表达。
 - 「正确答案：…（结果页给出 / 满分反推 / 平台未开放）」这一行**保留**：它记录答案来源，判断题也只能靠它。
 - 平台没给正确答案时照旧附「我的答案：…（得分 x/y）」，这是唯一的线索。
+
+### 2.2 平台没给答案的题：可以查外部题库，但只作提示
+
+`C:/publicworkspace/尔雅网课题库` 里有 60 多门课的人工答案 PDF，能救「平台没开正确答案、又不是满分」的题：
+
+```powershell
+# 1) 比对：同时给出候选答案清单（只覆盖 platform 留空的题）
+python scripts/bank_crosscheck.py --pdf "<课程 PDF>" --bank knowledge/<course>/bank.json `
+  --external-out runs/<task>/external-<course>.json
+# 2) 重建 bank.md，把候选写进对应题
+python scripts/quiz_bank.py build --nodes … --course <course> --expected … `
+  --external-answers runs/<task>/external-<course>.json
+```
+
+- 渲染成「外部题库参考：D（尔雅题库 <PDF 名>，非平台答案，谨慎采用）」，**只在平台没给答案、也不是满分反推时出现**；
+  平台给了答案的题一个字都不改。
+- 先看 `PDF records / agree / disagree` 三个数：`示例课程13` 实测 78 题匹配里 **11 处冲突**（含 PDF 漏选项），
+  这种 PDF 只能当线索，不要当答案表用。
+- 外部题库目录里**没有 Python 两门课**，那两门遇到空答案只能留空并如实标注。
 
 ## 3. 字段口径（bank.json）
 

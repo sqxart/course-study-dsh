@@ -20,6 +20,10 @@
 
 - 一个节点**只进一次**：视频 → 弹题 → 章节测验 → 最后回目录核任务点数。
 - 倍速优先点播放器菜单；菜单点不动才写 `video.playbackRate`，并记 `rate_source=property`。
+- **顺手留下文本**：进节点时播放器帧的 `allsubtitle`（含 srt 地址）与签名 `mp4` 一起记进 `evidence.json`
+  （`subs` / `media` 字段），节点结束后跑 `scripts/media_keep.py keep --evidence …`：
+  有 SRT 存 `subs/<course>/<节>.srt`，没有才按 `[asr] enabled` 用 90 秒分块转写成 `asr/<course>/<节>.txt`。
+  知识总结直接用这份文本，不再为同一节课重复取字幕或重复付费转写。
 - 完成判据只看平台标记（目录行尾剩余点数、`icon_Completed`、结果页「已完成」）。
 - 节点结束先写 `runs/<task>/evidence.json`，再过 `scripts/check_evidence.py`。
 
@@ -29,6 +33,8 @@
 2. 探测倍速并起播，观察器按 `总预算 ≈ 剩余秒数 / rate` 续，单次调用 ≤175 秒。
 3. `ended` 后立刻回目录，读这一行的剩余任务点数。
 4. `evidence.json` 里把测验段写成 `"quiz": {"opened": false, "decision": "skipped"}`，`video.ended` 只作本地状态，不作完成证明。
+5. 字幕同样顺手留下：`subs`（`allsubtitle` 与 srt 列表）与 `media.mp4` 写进 `evidence.json`，回目录前跑
+   `scripts/media_keep.py keep --evidence <该节点>`。只做视频的节点往往就是以后要写复习卡的节点，此时不存等于白看。
 
 判据：回目录后该行点数减少（或整行数字消失）。数字没变就是没录上，按 [现场笔记](field-notes.md) 排查，不要重复刷。
 
@@ -56,6 +62,8 @@
 流程：[知识总结](knowledge.md)。要点：
 
 - 输入是这一节的字幕（无字幕且 `[asr] enabled = true` 才用 `scripts/asr_mimo.py --chunk-seconds 90` 转写）。
+  **先看 `runs/<task>/subs/<course>/` 与 `runs/<task>/asr/<course>/` 里有没有现成文件**——功能 1/2 已经顺手存过，
+  有就直接用；没有再回放节点取 `allsubtitle`，别为了字幕再刷一遍视频。
 - 一节一个 note，只写**能出选择题/判断题**的客观知识：定义、分类、人物与著作、年代数字、原则、因果、易混区别。
 - 不写时间轴、删掉举例（课程主体案例保留）、不写老师评价/劝学/课堂事务、不抄题目。
 - 每份 note 先过 `scripts/knowledge_doc.py check` 到 `ok`，再 `knowledge_doc.py build` 拼成 `knowledge.md`，缺节必须为 0。

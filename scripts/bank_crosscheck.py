@@ -12,6 +12,7 @@ import json
 import re
 import sys
 import unicodedata
+from pathlib import Path
 
 SECTION = re.compile(r'^(?:(?:一|二|三|四|五|六|七|八|九|十)+[、.]\s*)?([^\d\s].{0,40})$')
 QUESTION = re.compile(r'^\s*(\d{1,3})\s*[.．、]\s*(.+?)\s*$')
@@ -99,11 +100,27 @@ def compare(records, bank):
     return rows, matched
 
 
+def build_candidates(rows, source_name):
+    """Only the questions the platform left blank: the key is a hint, never an override."""
+    candidates = {}
+    for row in rows:
+        if row.get('bank_correct'):
+            continue
+        if not row.get('pdf_answer'):
+            continue
+        candidates.setdefault(row['section'], {})[str(row['idx'])] = {
+            'answer': row['pdf_answer'],
+            'source': '尔雅题库 {0}'.format(source_name),
+        }
+    return candidates
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--pdf', required=True)
     parser.add_argument('--bank', required=True)
     parser.add_argument('--json')
+    parser.add_argument('--external-out', help='Write candidate answers for the questions the platform left blank')
     parser.add_argument('--list', action='store_true', help='List every parsed PDF record')
     args = parser.parse_args(argv)
 
@@ -129,6 +146,12 @@ def main(argv=None):
     if args.json:
         with open(args.json, 'w', encoding='utf-8') as handle:
             json.dump({'records': records, 'rows': rows}, handle, ensure_ascii=False, indent=1)
+    if args.external_out:
+        candidates = build_candidates(rows, Path(args.pdf).stem)
+        with open(args.external_out, 'w', encoding='utf-8') as handle:
+            json.dump(candidates, handle, ensure_ascii=False, indent=1)
+        total = sum(len(entries) for entries in candidates.values())
+        print('EXTERNAL_CANDIDATES={0} SECTIONS={1} WROTE={2}'.format(total, len(candidates), args.external_out))
     return 0
 
 

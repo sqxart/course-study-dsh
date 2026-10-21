@@ -78,6 +78,9 @@ Harness 的通道事实、已实测范围与调用预算在 [DSH 运行说明](r
 - [题库计划](scripts/bank_plan.py)：从 run ledger 取「应该有测验的节号」，从 evidence 补 `work_id`/分数，产出 `expected-*.json` 与 `plan-*.json`。
 - [节点驱动生成](scripts/bank_node_js.py)：把 `references/bank.md` 里的取数驱动实体化成每节一个 JS，交浏览器 `filename` 直载，免去每节点粘贴 4 KB 脚本。
 - [字幕抓取](scripts/bank_subs.py)：按 capture 里记下的字幕地址批量下载 SRT，供知识总结使用。
+- [文本留存](scripts/media_keep.py)：看完一个视频节后，把 `evidence.json` 里的 `subs`（或签名 `mp4`）落成
+  `subs/<course>/<节>.srt`；没有字幕且 `[asr] enabled` 时才转写成 `asr/<course>/<节>.txt`。
+  功能 1/2 顺手调用，功能 4 直接复用，**同一节课的字幕不重复抓、转写不重复付费**。
 - [无字幕转写](scripts/asr_mimo.py)：无字幕视频用 MiMo ASR 转写（签名直链 mp4 + ffmpeg + 90 秒分块），
   可在播放的同时并行转写；受 `local/private.toml` 的 `[asr] enabled` 开关控制，关掉就回退旧流程。
 - [知识总结拼装](scripts/knowledge_doc.py)：校验每节 note（要点条数/时间戳/不许抄题/不许事务占位），按章拼成 `knowledge.md`；`build` 缺节会点名。
