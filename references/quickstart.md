@@ -13,6 +13,14 @@
 - 只用当前账号那条通道（`mcp__browser__*` / `mcp__browser2__*` / `mcp__browser3__*` 之一，见 [多账号运行](multi-account.md)），不要跨账号混用；不要用 `browser_evaluate` 去读 `mooc2-ans` 目录帧——它被 `document.domain` 隔离，读不到。
   目录和播放器都在 `page.frames()` 里，用 `browser_run_code_unsafe` 的 `page`。
 - 观察器单次 **175 秒**（本机 `toolCallTimeoutMs=300000`），返回 `timeout` 就续一段，不算失败。
+- **别让浏览器抢你的前台。** 跳页/开新标签会把 DSH 那个浏览器窗口顶到最前，打扰用户。开工时在后台挂一次：
+
+  ```powershell
+  python scripts/browser_window.py watch --minutes 180   # 前台一露头就最小化，只动 DSH 自己的 profile
+  ```
+
+  不想挂后台就在每次跳转后跑 `python scripts/browser_window.py minimize`（幂等，只匹配 `--user-data-dir` 里带 `.dsh` 的窗口）。
+  实测最小化后页面仍 `visibilityState=visible`、截图正常、新播放器继续播；**旧播放器会因失焦暂停**，那类课别最小化。
 - **一节里可能有多个视频。** `ananas/modules/video` 常匹配到 **2 个 iframe**，而 `cards` 帧写明的完成条件是
   **「观看时长需 ≥ 总时长的 90%」**。只播第一个就永远拿不到那个任务点：若第一段占总时长不足 90%，只播它不能完成视频点；补播其余视频后再核对目录。
   → **遍历所有视频帧逐个播到 `ended`，不要 `.find()` 取第一个。**
