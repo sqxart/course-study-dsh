@@ -19,7 +19,7 @@ Harness 的通道事实、已实测范围与调用预算在 [DSH 运行说明](r
    |---|---|---|
    | 看课、续跑、弹题、章节测验 | [单节点快速配方](references/quickstart.md) → [网课流程](references/course-flow.md) | [学习通](references/chaoxing.md) |
    | 已提交节点取题库（只读） | [题库取数](references/bank.md) | 结果页明文；正确答案是否可见每课一策 |
-   | 从字幕写知识总结 | [知识总结](references/knowledge.md) | 散文式讲清内容，不是摘词条；题库与知识总结分两份文件 |
+   | 从字幕写知识总结 | [知识总结](references/knowledge.md) | 只收能出选择题/判断题的客观知识；题库与知识总结分两份文件；无字幕节由 `[asr]` 开关决定做不做 |
    | 摸不清的现象、报错、旧坑 | [现场笔记](references/field-notes.md) | 先查这里再动手 |
    | 两个账号 / 两条浏览器通道 | [多账号运行](references/multi-account.md) | 一个账号一条通道、一个标签 |
    | 有无新课件/测验、截止时间 | 网课流程的列表巡检 | 先停在列表；开始测验是后续独立动作 |
@@ -75,6 +75,8 @@ Harness 的通道事实、已实测范围与调用预算在 [DSH 运行说明](r
 - [题库计划](scripts/bank_plan.py)：从 run ledger 取「应该有测验的节号」，从 evidence 补 `work_id`/分数，产出 `expected-*.json` 与 `plan-*.json`。
 - [节点驱动生成](scripts/bank_node_js.py)：把 `references/bank.md` 里的取数驱动实体化成每节一个 JS，交浏览器 `filename` 直载，免去每节点粘贴 4 KB 脚本。
 - [字幕抓取](scripts/bank_subs.py)：按 capture 里记下的字幕地址批量下载 SRT，供知识总结使用。
+- [无字幕转写](scripts/asr_mimo.py)：无字幕视频用 MiMo ASR 转写（签名直链 mp4 + ffmpeg + 90 秒分块），
+  可在播放的同时并行转写；受 `local/private.toml` 的 `[asr] enabled` 开关控制，关掉就回退旧流程。
 - [知识总结拼装](scripts/knowledge_doc.py)：校验每节 note（要点条数/时间戳/不许抄题/不许事务占位），按章拼成 `knowledge.md`；`build` 缺节会点名。
 - [列表采集](scripts/collect_task_list.js) 与 [巡检对比](scripts/inspect_tasks.py)：只读当前已加载列表；`summary`/`diff`。
 - [Harness 探针](scripts/dsh_probe.py)：`--tools` 读当前工具清单，报告技能发现根、安装副本漂移和浏览器候选；`--require-discovered` 扫不到安装副本时 exit 5，`--require-winner <target>` 发现的是别的安装时 exit 6；只读文件系统，不联网、不打开页面。

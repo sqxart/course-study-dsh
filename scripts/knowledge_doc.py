@@ -23,10 +23,11 @@ REQUIRED_SECTIONS = ('考点知识', '概念表')
 FORBIDDEN_SECTIONS = ('本节讲什么', '本节结论', '要点')
 DEPRECATED_MARKERS = ('【单选题】', '【多选题】', '【判断题】', '我的答案：', '正确答案：')
 BANK_MARKERS = DEPRECATED_MARKERS
-MIN_POINTS = 6
-MIN_CHARS = 200
+MIN_POINTS = 8
+MIN_CHARS = 300
 _CLOCK = r'\d{1,2}:\d{2}(?::\d{2})?'
-# A knowledge point is anchored to a cue or a range; both count.
+# The review card carries no timeline: the user reads it to answer questions, not to jump
+# into the video, so any (mm:ss) marker is noise.
 TIMESTAMP = re.compile(r'[\[(（]\s*' + _CLOCK + r'(?:\s*[–—~-]\s*' + _CLOCK + r')?\s*[\])）]')
 # Bullets or numbered items — the terse format is a list, not an essay.
 POINT = re.compile(r'^\s*(?:[-*]|\d+[.、])\s+\S', re.M)
@@ -57,8 +58,8 @@ def validate_note(text):
             break
     if points < MIN_POINTS:
         problems.append('only {0} knowledge bullets, need {1}'.format(points, MIN_POINTS))
-    if timestamps < 3 and 'ASR' not in body[:400]:
-        problems.append('only {0} timestamps, need 3 (or an ASR marker)'.format(timestamps))
+    if timestamps:
+        problems.append('timestamps are not wanted in a review card: drop the (00:00) markers')
     if chars < MIN_CHARS:
         problems.append('only {0} chars, need {1}'.format(chars, MIN_CHARS))
     return problems, {'points': points, 'timestamps': timestamps, 'chars': chars}
@@ -90,7 +91,7 @@ def build_knowledge(bank, notes, generated_at=None):
         '# {0} 知识总结'.format(bank.get('course_title') or bank['course']),
         '',
         '- 覆盖：{0}/{1} 节有总结（其余无字幕或未整理）'.format(len(with_notes), len(sections)),
-        '- 依据：课程视频字幕原文；每条考点括号里是字幕时间，可直接回看',
+        '- 依据：课程视频字幕原文（无字幕则 ASR 转写）；只收能出选择题/判断题的客观知识',
         '- 与题库的关系：题目、选项、我的答案、得分在 `bank.md`，本文件只写支撑这些题的知识',
         '- 生成时间：{0}'.format(generated_at or datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat()),
         '',

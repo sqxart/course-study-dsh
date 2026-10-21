@@ -28,6 +28,23 @@ from pathlib import Path
 ENDPOINT = 'https://api.xiaomimimo.com/v1/chat/completions'
 MODEL = 'mimo-v2.5-asr'
 DEFAULT_KEY_FILE = Path(__file__).resolve().parents[1] / 'local' / 'mimo.key'
+PRIVATE_CONFIG = Path(__file__).resolve().parents[1] / 'local' / 'private.toml'
+
+
+def asr_enabled():
+    """`[asr] enabled` in local/private.toml; missing file or key means the public default (off)."""
+    try:
+        import tomllib
+    except ImportError:                     # Python < 3.11
+        return None, 'tomllib unavailable'
+    if not PRIVATE_CONFIG.is_file():
+        return None, 'no local/private.toml'
+    try:
+        payload = tomllib.loads(PRIVATE_CONFIG.read_text(encoding='utf-8'))
+    except Exception as error:              # noqa: BLE001 - a broken config must be visible
+        return None, 'unreadable local/private.toml: {0}'.format(error)
+    value = (payload.get('asr') or {}).get('enabled')
+    return bool(value) if value is not None else None, None
 
 
 def find_tool(name):
@@ -156,7 +173,17 @@ def main(argv=None):
     parser.add_argument('--api-key', help='MiMo API key (else $MIMO_API_KEY or key file)')
     parser.add_argument('--key-file', default=str(DEFAULT_KEY_FILE))
     parser.add_argument('--keep-audio', action='store_true', help='Keep the intermediate mp3 chunks')
+    parser.add_argument('--force', action='store_true',
+                        help='Run even when local/private.toml has [asr] enabled = false')
     args = parser.parse_args(argv)
+
+    enabled, why = asr_enabled()
+    if enabled is False and not args.force:
+        raise SystemExit('ASR is switched off: set [asr] enabled = true in local/private.toml '
+                         '(or pass --force). {0}'.format(why or ''))
+    if enabled is None and not args.force:
+        print('note: [asr] enabled not found in local/private.toml ({0}); continuing'.format(why or 'default'),
+              file=sys.stderr)
 
     key = read_key(args)
     ffmpeg = find_tool('ffmpeg')

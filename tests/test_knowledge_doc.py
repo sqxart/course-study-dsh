@@ -23,13 +23,14 @@ knowledge = load()
 
 GOOD_NOTE = """**考点知识**
 
-- 公地的悲剧：公共资源产权边界不清、谁都能用而无人爱护，因而被过度使用（00:01:17–00:01:36）
-- 它属于法律经济学、特别是产权经济学视角；福利经济学把同一现象叫外部性（00:01:36–00:01:56）
-- 外部性指一方使用资源、成本由另一方承担，庇古传统因此主张政府管制与税收（00:07:33–00:08:23）
-- 单一视角有时间漏洞：公有没变而现象只在今年出现，就必须再找今年的特殊原因（00:02:05–00:02:40）
-- 视角决定解决方案：产权视角导向私有化，福利经济学导向管制与分类管理（00:06:39–00:07:33）
-- 人口学视角关注年龄分布：只有儿童才会挖沙坑堆沙堡（00:03:11–00:04:21）
-- 工程材料视角：沙与泥混合成砂浆，人工铺沙被台风削薄才露出泥潭（00:05:10–00:06:39）
+- 公地的悲剧：公共资源产权边界不清、谁都能用而无人爱护，因而被过度使用。
+- 它属于法律经济学、特别是产权经济学的视角。
+- 福利经济学把同一现象称为外部性：一方使用资源，成本由另一方承担。
+- 庇古传统据此主张政府管制与税收调节。
+- 视角不同，推导出的方案不同：产权视角导向私有化，福利经济学导向管制。
+- 「以前也是公有、为什么只有今年」这一问，说明单一时视角解释不了时间上的差异。
+- 人口学视角把关键因素落在年龄分布上：儿童才会挖沙坑堆沙堡。
+- 工程材料视角：沙与泥混合成砂浆，人工铺沙被台风削薄才露出泥潭。
 
 **概念表**
 
@@ -55,9 +56,9 @@ class ValidateTest(unittest.TestCase):
     def test_a_real_note_passes(self):
         problems, stats = knowledge.validate_note(GOOD_NOTE)
         self.assertEqual(problems, [])
-        self.assertGreaterEqual(stats['points'], 5)
-        self.assertGreaterEqual(stats['timestamps'], 3)
-        self.assertGreaterEqual(stats['chars'], 400)
+        self.assertGreaterEqual(stats['points'], 8)
+        self.assertEqual(stats['timestamps'], 0)
+        self.assertGreaterEqual(stats['chars'], 300)
 
     def test_word_salad_is_rejected(self):
         thin = ('**考点知识**\n- 高带宽\n- 高实时性\n\n**概念表**\n- 高带宽\n')
@@ -84,11 +85,11 @@ class ValidateTest(unittest.TestCase):
         self.assertEqual(stats, {})
 
     def test_time_ranges_count_as_anchors(self):
-        # The spec prefers ranges, so the counter must not silently ignore them.
-        text = GOOD_NOTE.replace('（00:01:17）', '（00:01:17–00:01:21）')
+        # The review card must not carry a timeline at all.
+        text = GOOD_NOTE.replace('- 公地的悲剧：公共资源', '- 公地的悲剧（00:01:17）：公共资源')
         problems, stats = knowledge.validate_note(text)
-        self.assertEqual(problems, [])
-        self.assertGreaterEqual(stats['timestamps'], 3)
+        self.assertTrue(any('timestamps are not wanted' in p for p in problems))
+        self.assertGreaterEqual(stats['timestamps'], 1)
         self.assertEqual(len(knowledge.TIMESTAMP.findall('（00:01:17–00:01:21）')), 1)
         self.assertEqual(len(knowledge.TIMESTAMP.findall('(00:01:17 - 00:01:21)')), 1)
 

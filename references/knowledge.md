@@ -1,29 +1,45 @@
-# 知识总结：只写考点知识与概念（复习卡）
+# 知识总结：只写能考的客观知识（复习卡）
 
 课程内容落两份文件，**不许混**：
 
 | 文件 | 内容 | 谁写 |
 |---|---|---|
 | `knowledge/<course>/bank.md` / `bank.json` | 题库：题面、选项、**正确答案**；平台没给答案的题才附我的答案 | `scripts/quiz_bank.py build` |
-| `knowledge/<course>/knowledge.md` | 知识总结：这一节涉及的**知识与概念**，一条一句 | 每节一个 agent 写 note，再由 `scripts/knowledge_doc.py build` 拼装 |
+| `knowledge/<course>/knowledge.md` | 知识总结：**能出选择题/判断题的客观知识**，一条一句 | 每节一个 agent 写 note，再由 `scripts/knowledge_doc.py build` 拼装 |
 
-## 0. 写什么、不写什么
+## 0. 一条知识算不算「能考」
 
-- **写**：定义、分类、判断依据、因果关系、结论性判断、易混术语的区别。
-- **不写**：本节讲什么 / 要点 1..N / 本节结论 这类总结；不要「含义 / 怎么考 / 易混」分行讲道理；
-  不要写学习方法、考试技巧、老师个人经历、课堂事务。
-- **不写**题目原文和答案。这里写的是"支撑这些题的知识"。
-- 只写字幕里讲过的；字幕没讲的原理、数据、结论一律不补。
+判断标准只有一个：**把这条单独拿出来，能不能出成一道选择题或判断题**。
 
-## 1. 一节 note 的格式（`notes/<course>/<section>.md`）
+- **写**：定义、分类与层级、人物与著作、年代与数字、原则与规则、因果与判断标准、
+  容易混的两个术语的区别。
+- **不写**：老师的评价、抱怨、劝学、个人经历、比喻修辞、课堂事务。
+  这些考试不考，写进去就是噪音。
+
+下面是**用户明确点名不合格**的三条（示例课程11 1.3），照这个标准删：
+
+| 不合格 | 为什么 |
+|---|---|
+| 平时没教怎么查、怎么写，期末与毕业前却直接要论文 | 情绪与现象描述，出不了题 |
+| 这不怨法官，法学教育没培训这项技能，律所也一样 | 评论，无知识点 |
+| 巧：熟能生巧、运用自如到如臂使指的本事，教不会，只能自己练成 | 修辞与劝学，不是定义 |
+
+改写成能考的形态（同一节的正确写法）：
+
+- 孟子：「梓匠轮舆能与人规矩，不能使人巧」——规矩可教，巧不可教。
+- 国外法学院把「法律写作与检索」列为一年级基本课程。
+- 与部门法知识相比，检索与运用资料做研究的能力更根本。
+- 自学内容包含：学术规范、注释体例、专业规范。
+
+## 1. 格式（`notes/<course>/<section>.md`）
 
 ```markdown
 **考点知识**
 
-- 提问是学术研究的源头，也是后续写作目标的总源头（00:00:20–00:00:45）
-- 学习与学术要分开：学术论文按创新性分三类——澄清旧理论、批判旧理论、从现实中发现新问题
-- 本科论文要求的是第一类，能对主流问题提出反思即可
-- 外部性指一方使用资源、成本由另一方承担
+- 提问是整个学术研究的源头，也是后续写作目标的总源头。
+- 学术论文按创新性分三类：澄清旧理论、批判旧理论、从现实中提出新问题。
+- 本科论文只要求第一类：对主流问题提出反思。
+- 「梓匠轮舆能与人规矩，不能使人巧」出自《孟子》。
 
 **概念表**
 
@@ -33,49 +49,43 @@
 
 硬性要求（`knowledge_doc.py check` 会卡）：
 
-- 必须含 `考点知识` 与 `概念表` 两段（顺序如此）。
-- `考点知识` 至少 6 条，每条**一句话**，短。
-- 每条尽量带时间戳（单点或区间）；若该节只有 ASR 转写、没有字幕，note 顶部写一行 `来源：ASR 转写`，
-  校验会放行。
-- 正文至少 200 字。
-- **不许**出现 `本节讲什么` / `要点` / `本节结论`；**不许**出现 `【单选题】` / `我的答案：` / `正确答案：`。
-- 不许写「怎么考 / 含义 / 易混：」这类分行讲解——用户要的是知识点本身。
+- 必须含 `考点知识` 与 `概念表` 两段，顺序如此。
+- `考点知识` 至少 8 条，每条**一句话**，短。
+- 正文至少 300 字。
+- **不许带时间轴**：出现 `(00:01:17)` 这类括号直接判不合格。
+- 不许出现 `本节讲什么` / `要点` / `本节结论`（旧格式），不许出现 `【单选题】` / `我的答案：` / `正确答案：`。
+- 不许写「含义 / 怎么考 / 易混：」这类分行讲解——要的是知识点本身。
 
 ## 2. 调用方式（一节一个 agent，可并行）
 
-给 agent 的输入：
-
-- 字幕：`runs/bank/subs/<course>/<section>.srt`；没有字幕的节用 ASR 转写
-  （`scripts/asr_mimo.py`，见下）。
+- 字幕：`runs/<task>/subs/<course>/<section>.srt`；无字幕且 `[asr] enabled = true` 时用
+  `scripts/asr_mimo.py --chunk-seconds 90` 转写（见 §3）。
 - 该节题目（只用于定位考点，**不许抄进产出**）：
   `python scripts/quiz_bank.py section --bank knowledge/<course>/bank.json --code <section>`。
-- 产出：`runs/bank/notes/<course>/<section>.md`，写完自己跑
+- 产出：`runs/<task>/notes/<course>/<section>.md`，写完跑
   `python scripts/knowledge_doc.py check <note>`。
 
-## 3. 没有字幕的节：MiMo ASR
+## 3. 无字幕：由 `local/private.toml` 的 `[asr]` 开关决定
 
-播放器给的是签名直链 MP4（`s2.cldisk.com/.../sd.mp4`，CDN 要 `Referer: https://mooc1.chaoxing.com/`，
-不需要 cookie）。一次调用完成下载 → ffmpeg 转 16k 单声道 mp3 → 分块 → MiMo ASR：
+| `[asr] enabled` | 行为 |
+|---|---|
+| `true` | 无字幕 → ASR 转写 → 按转写原文答题；无字幕节也写知识总结 |
+| `false` | 旧流程：无字幕 → 学科判断（标 low-confidence）；知识总结**跳过**这些节 |
 
-```powershell
-python scripts/asr_mimo.py --source "<signed mp4 url>" --out runs/bank/asr/<section>.txt
-```
-
-- 端点 `https://api.xiaomimimo.com/v1/chat/completions`，`model=mimo-v2.5-asr`，`api-key` 头；
-  key 放 `local/mimo.key`（gitignore）或 `$MIMO_API_KEY`。
-- 实测：14.7 分钟视频 38.7 MB → 转写 **<时长>秒**，计费 <时长>秒（约 0.12 元），中文与专名准确。
-- ASR 输出没有时间轴，所以这类 note 不强制时间戳。
+- 播放器给的是签名直链 MP4（`s2.cldisk.com/.../sd.mp4`，要 `Referer: https://mooc1.chaoxing.com/`，不要 cookie），
+  **不播放也能取到**，所以可以在播放的同时并行转写：边播边转，播完直接做测验。
+- CDN 每连接只给 3–10 MB 就断，脚本已做 Range 断点续传。
+- **必须 90 秒分块**：600 秒分块会让模型重复同一段十几遍。
+- 实测地球历史 5 个未完成节点、19 题，**全部 <成绩>分**。
 
 ## 4. 拼装
 
 ```powershell
-python scripts/quiz_bank.py build --nodes runs/bank/nodes/paper-writing --course paper-writing `
-  --title 示例课程11 --expected runs/bank/expected-paper-writing.json
 python scripts/knowledge_doc.py build --bank knowledge/<course>/bank.json `
   --notes runs/<task>/notes/<course>
 ```
 
 ## 5. 质量判据
 
-1. 看完「考点知识」能不能直接答这一节的题。
-2. 每条是不是**一句话就能读完**；读完有没有"在复习而不是在上课"的感觉。
+1. 这条能不能出成一道选择题/判断题？不能就删。
+2. 有没有出现「老师说了什么」「应该怎样学」的组织？有就删。

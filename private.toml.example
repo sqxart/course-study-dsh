@@ -26,6 +26,18 @@ submit = false
 # Requires submit = true and remaining attempts on the platform.
 redo_once = false
 
+[asr]
+# Transcribe a video that has no subtitle track, so the quiz can still be answered from
+# the lecture's own words. Works on an uncompleted node: the player exposes a signed mp4
+# as soon as the page loads, so nothing has to be watched first, and it can run while the
+# video plays.
+#   true  = no subtitles -> MiMo ASR transcription -> answer with the transcript
+#   false = old behaviour: no subtitles -> subject-knowledge inference (low confidence),
+#           and sections without subtitles are skipped in the knowledge document
+enabled = false
+# 600-second chunks made the model repeat one paragraph; 90 seconds is the tested value.
+chunk_seconds = 90
+
 [limits]
 # Advisory budget, not a code gate: the executor records the call count in
 # evidence.json and flags overruns. 30 is the warm-node target; a cold run can
