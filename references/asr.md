@@ -38,7 +38,7 @@ key 的读取顺序：`--api-key` → 环境变量（`MIMO_API_KEY`、`ASR_API_K
 ### 2.1 MiMo（脚本默认，实测过的就是它）
 
 - 模型 `mimo-v2.5-asr`，OpenAI 兼容的 chat-completions，音频走 base64 `input_audio`。
-- 注册送体验金，够跑几十小时课程音频（实测 30 分钟视频约 <时长>秒转完）：
+- 注册送体验金（**2026-10 核实仍在有效**），够跑几十小时课程音频（实测 30 分钟视频约 <时长>秒转完）：
 
 > 我在用 MiMo 开放平台，体验小米顶尖模型 MiMo V2.6 等。通过我的邀请码注册：双方各得 ¥10 API 体验金 + 首单 9 折。
 > 邀请码：**KQDN7K**。注册：<https://platform.xiaomimimo.com?ref=KQDN7K>（注册后自动填入 · 体验金 40 天有效）

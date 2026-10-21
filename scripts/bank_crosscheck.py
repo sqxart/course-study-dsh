@@ -1,7 +1,8 @@
 """Parse a 尔雅 answer-key PDF and compare it with the questions we captured.
 
-The PDFs in C:/publicworkspace/尔雅网课题库 are human-made answer keys: a section heading,
-then numbered questions with A./B./C./D. options and a `答案：X` line. Matching them against
+Answer keys of this shape are human-made: a section heading, then numbered questions with
+A./B./C./D. options and a `答案：X` line. Point `--pdf` at one of yours (the author keeps a
+folder of them locally; nothing in this repo assumes a fixed location). Matching them against
 the live bank answers "is this key still current", which the user asked before trusting it.
 
     python scripts/bank_crosscheck.py --pdf "<pdf>" --bank knowledge/paper-writing/bank.json

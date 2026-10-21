@@ -250,7 +250,7 @@ python scripts/quiz_bank.py build --nodes runs/<task>/nodes/example-course `
 
 ### 2.2 平台没给答案的题：可以查外部题库，但只作提示
 
-`C:/publicworkspace/尔雅网课题库` 里有 60 多门课的人工答案 PDF，能救「平台没开正确答案、又不是满分」的题：
+用户提供的人工答案 PDF 可为「平台没开正确答案、又不是满分」的题提供参考；目录和文件路径由使用者指定：
 
 ```powershell
 # 1) 比对：同时给出候选答案清单（只覆盖 platform 留空的题）
@@ -263,9 +263,8 @@ python scripts/quiz_bank.py build --nodes … --course <course> --expected … `
 
 - 渲染成「外部题库参考：D（尔雅题库 <PDF 名>，非平台答案，谨慎采用）」，**只在平台没给答案、也不是满分反推时出现**；
   平台给了答案的题一个字都不改。
-- 先看 `PDF records / agree / disagree` 三个数：`示例课程13` 实测 78 题匹配里 **11 处冲突**（含 PDF 漏选项），
-  这种 PDF 只能当线索，不要当答案表用。
-- 外部题库目录里**没有 Python 两门课**，那两门遇到空答案只能留空并如实标注。
+- 先看 `PDF records / agree / disagree` 三个数；PDF 可能漏选项或与平台结果冲突，只能当线索。
+- 外部题库未覆盖的课程遇到空答案时留空并如实标注；目录名和位置由使用者自己给。
 
 ## 3. 字段口径（bank.json）
 
