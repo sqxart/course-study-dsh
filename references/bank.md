@@ -1,4 +1,4 @@
-# 题库与复习文档：从已提交的结果页取数
+# 题库：从已提交的结果页取数
 
 本文件只在**节点已经提交、课程已经清零**之后使用：不提交、不重做、不点「再次答题」。
 一个节点一次调用，读完立刻回目录并对比行尾——这是本阶段唯一的写盘来源。
@@ -228,13 +228,20 @@ python scripts/quiz_bank.py build --nodes runs/<task>/nodes/example-course `
 
 答题记录仍以 `runs/` 里的 evidence 为准（`work_id` / `question_count` / `score` 在那里面）；题库只补题面与选项。
 
-## 4. 复习文档
+## 4. 知识总结（另一份文件）
 
-题库跑通后再叠加字幕：
+题库与知识总结是两份文件，不要混：
+
+- `bank.json` / `bank.md`：题目、选项、我的答案、得分——由本文件的流程产出。
+- `knowledge.md`：这一节**讲了什么**（概念、判断依据、示例、结论）——由字幕写成，
+  一节一个 note，再由 `scripts/knowledge_doc.py` 拼装。格式、质量判据和调用方式见
+  [知识总结](knowledge.md)。
+
+字幕在这里顺手取到（播放器帧里的 `allsubtitle`），也可以事后单独下：
 
 ```powershell
-python scripts/subtitle_evidence.py fetch --url "<allsubtitle URL>" --out runs/<task>/subs/<section>.srt
+python scripts/subtitle_evidence.py fetch --url "<srt URL>" --out runs/<task>/subs/<section>.srt
 ```
 
-`knowledge/<course>/review.md` 按章 → 节组织，每节写「要点（字幕原话 + 时间轴）」「考点（题库）」
-「易错点（我答错的题）」；无字幕的课在文首标 `evidence_level: quiz-only`，只写题库能推出的东西。
+> 曾经的 `review.md`（用选项词匹配字幕、只摘几个词当「要点」）已废弃：它摘出来的是
+> `[00:01:17] 那么迫切需要一种高带宽` 这种残句，复习时没有信息量。应按原文组织客观知识，不能把零散选项词当作复习卡。
