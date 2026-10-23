@@ -2,7 +2,7 @@
 
 版本基线：DeepSeek Harness 桌面版 0.2.1-rc.2，profile `desktop`。本文件只写本机实测或当前版本包文档能互相印证的结论；历史小节只反映对应版本快照，**不等于当前能力**。其他 harness（ZCode/Codex）的 bootstrap、CDP 名称、写权限或调用时限不适用于本技能。
 
-## 当前通道（<运行日期>，1.0.11）
+## 当前通道（1.0.16）
 
 浏览器由 profile 的 `cordis.patch.yml` 中的 Playwright MCP 提供。下面是多通道配置形状，实际启用、登录和退役状态从本地配置读取；退役条目不再调用。
 
