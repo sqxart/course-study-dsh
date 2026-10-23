@@ -98,6 +98,24 @@ class PackagingTests(unittest.TestCase):
         # Regression guard: a personal path in any public file blocks the real export.
         self.assertEqual(package.public_scan(package.files(), []), [])
 
+    def test_platform_instance_id_is_flagged(self):
+        sample = self.base / 'sample.md'
+        # Build the id at runtime: a literal 8-digit run in this file would itself trip the rule.
+        value = ''.join(str(digit) for digit in (1, 2, 3, 4, 5, 6, 7, 8))
+        sample.write_text('章节测验 workId ' + value + '，5 题\n', encoding='utf-8')
+        findings = package.public_scan([(sample, Path('sample.md'))], [])
+        self.assertEqual([item['kind'] for item in findings], ['platform-instance-id'])
+
+    def test_run_directory_date_is_not_flagged(self):
+        sample = self.base / 'paths.md'
+        sample.write_text('python scripts/quiz_bank.py check runs/bank/nodes/a.json\n', encoding='utf-8')
+        self.assertEqual(package.public_scan([(sample, Path('paths.md'))], []) == [], True)
+
+    def test_synthetic_placeholder_is_not_flagged(self):
+        sample = self.base / 'fixture.md'
+        sample.write_text("'work_id': 'work-example', 'course_id': 260001\n", encoding='utf-8')
+        self.assertEqual(package.public_scan([(sample, Path('fixture.md'))], []), [])
+
     def test_cannot_target_an_old_skill_name(self):
         output = self.base / 'course-homework'
         self.assertEqual(self.call(['install', '--target', str(output)]), 2)

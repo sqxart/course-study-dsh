@@ -285,18 +285,12 @@ v24 新布局与旧 mooc2 目录不同：旧的 `#cur<chapterId>` 选择器可�
 - **v24 章节测验流程**：点「章节测验」→ 内层 iframe `mooc1.chaoxing.com/mooc-ans/work/doHomeWorkNew?workId=...` → **对 frame body 做元素截图**（视口截图只能拍到前两题）→ `quiz_ocr.py` → `quiz_panel.py` → 从 `li[role=radio]` 读 `qid` / `qtype`（单选 `span[data]` 是 A–D，判断是 `true` / `false`）→ `li[qid=X].nth(i)` 点击 → 核对 `input[name=answer<qid>]` 与 `aria-checked` → 点 `.btnSubmit` → 主页面 `#workpop` 点「提交」→ 结果帧 `selectWorkQuestionYiPiYue` 显示「已完成 / 第1次作答 / 本次成绩」。**提交后该帧就是明文**（题干 + 我的答案 + 正确答案 + 得分），可直接当复盘与题库来源。旧播放器的弹题控件要点 `input[type=radio]`，v24 测验页要点 `li[qid]`，进页先探骨架。
 - **三个提交坑**：① `doHomeWorkNew` 帧 URL 先出现、`.TiMu` 后渲染，必须**等 `.TiMu` 出现**再截图/作答；在空帧上点 `.btnSubmit` 完全无响应。② `#workpop` 的可见副本在 **studentstudy 帧**（不是工作帧、也不在顶层页），确认要点 `#workpop a.jb_btn`「提交」。③ 多选隐藏 `input[name=answer<qid>]` 存 `ABC`（**不带逗号**），按 `A,B,C` 比对会误判、白放弃一次提交。弹题的判断题 radio 若点 `li` 不变，需 `input.checked=true` + `dispatchEvent(new Event('change',{bubbles:true}))`。
 
-## 两账号各 10 节点（<运行日期> 实测）
+## 两账号有界并发（技术边界）
 
-- 范围：account-a 10 节（丝路 4.3/4.4/5.1–5.3 + 网络安全 1.4–1.8），account-c 10 节（无人驾驶 1.1/1.2/1.3/2.1/2.2.1/2.2.2/2.3/2.4.1/2.4.2/2.5）；视频 + 章节测验，全部任务点清零。
-- 15 次章节测验各提交一次：**13×100 + 2×50**（A 5.2/5.3 多选错；`redo_once=false` 未重做）；网络安全 1.4–1.8 本身没有章节测验。
-- 独立回读目录：20 行全部无尾部任务点数字；20 份 evidence 过 `check_evidence.py`；无验证码/9010/多终端/日上限/登出。
-- 视频合计 **9207.544 s**；20 节点 token 合计 **16.60M**（含两个试点异常：A 4.3 5.40M/74 次、C 1.1 1.74M/28 次）；去掉这两个异常后 **18 节点平均 0.53M/节点**。
-- 稳定态：纯视频节点 **0.20–0.55M / 5–14 次调用**；视频+测验 **0.43–0.74M / 8–25 次**。观察器 220 s；400 s@2x 的视频通常 1 次观察器就 `ended`。
-- **workflow 编排**：`workflow` 的 `agent()` 每节点一个子 agent，两个账号各一条串行链、两条链并行；主会话只发一次编排调用收结构化结果，省掉逐节点 spawn/汇总的主上下文开销。节点 prompt 必须写死工具白名单（只用 `browser_run_code_unsafe`/`pwsh`/`write`）、禁止 web/文档/snapshot、18 次调用上限、固定代码配方与 evidence 模板。
-- **并发上限不是技能常量**：同时能跑多少子 agent 由当前 harness 与所接模型决定（本机 DSH + DeepSeek 上见过 8；换模型/换部署可能更多或更少）。
-  `agent()` 起不来会整批报 `subagent limit reached`，那是运行时的容量信号，**不是平台风控**：减半并发、或改成单 workflow 分块重跑即可，
-  别把数字写进配方，也别据此判断账号出了问题。
-- 反例：A 4.3 的 74 次/5.40M 来自读文档 + `web_search` 找题 + `browser_snapshot` 试探；同一门课的 4.4 用紧凑配方是 16 次/0.65M。
+- 不同账号各用独立浏览器通道和单标签串行链；按账号分别核对目录、evidence 与停止信号。
+- workflow 可将每节点委派给子 agent，主会话只收结构化结果。节点 prompt 固定工具白名单、调用预算、代码配方和 evidence 模板，减少重复探索。
+- 并发容量由 harness 和模型决定，不是技能常量；`subagent limit reached` 是运行时容量信号，按容量减半或分块，不能混同平台风控。
+- 长视频同时播放、测验与提交并发未充分验证；具体分配与恢复见 [多账号运行](multi-account.md)。
 
 ## 节点级隔离与调用预算（M1）
 
@@ -346,78 +340,65 @@ async () => {
 
 观察器随后单独一次调用（每次 175 秒，`timeout` 续）；结束回目录读尾部任务点数。**记录里必须写明 `rateSource`**：`menu` 是官方动作，`property` 是退路。
 
-## M2 单节点验收（<运行日期> 实测）
+## 单节点验收（方法）
 
-两次由子 agent 独占浏览器、单标签跑完整节（视频 + 弹题 + 章节测验），分别量调用数、token 与任务点。
+由子 agent 独占浏览器、单标签执行节点，分别量调用数、token 和平台任务点。
 
-| 节点 | 视频 | 倍率 | 调用 | 会话 token | 任务点 | 测验 |
-|---|---|---|---|---|---|---|
-| 地球历史 1.3.3 | 454.6 s | 1x（锁速） | 10（修配方前） | 530,744 | 2 → 0 | 75 分，只提交 1 次 |
-| 地球历史 1.4.1 | 389.6 s | 1x（锁速） | 8 | 491,773 | 2 → 0 | 100 分，只提交 1 次 |
+- 调用数取会话 `tool/call` 事件，token 取 `tokens.total`；任务点用新加载目录快照跑 `toc_status.py` 前后对比。
+- 预算公式（1x 锁速课）：`调用 ≈ 4 + ceil(视频秒数 / 175)`；4 是进节点起播、OCR、提交回目录和写证据，弹题会额外早退续播。2x 可用时观察次数相应减少。
+- 公开默认 `mode=evidence`；无字幕测验停在证据页，不提交推断答案。`completion` 按当前配置和授权执行。
 
-- **两节都是本地 `mode=completion`（完成优先）跑的**：公开默认 `mode=evidence` 遇到无字幕测验会停在证据页，不会提交推断答案（1.3.3 的 75 分属于完成模式）。
-- **量法**：调用数取该子 agent 会话的 `tool/call` 事件（`session_cost.py` 的 `tool_calls` 还包含最后一条汇报消息，节点本身减 1）；token 取同一会话的 `tokens.total`；任务点用**新加载**的目录快照跑 `toc_status.py` 前后对比（1.3.3 之后课程 244→242，1.4.1 之后 242→240，两次都复核到节行尾部数字消失）。
-- **预算公式**（1x 锁速课）：`调用 ≈ 4 + ceil(视频秒数 / 175)`。4 = 进节点并起播（合并一次调用）+ OCR 一次 + 提交并回目录一次 + 写证据一次；观察器每 175 s 一次，弹题当次早退、由下一次续播。389.6 s 算出 7，1.4.1 实测 8：多出的 1 次是首次选答时按可见文字匹配（字体混淆，必然失败）导致的安全中止，不是流程必需。
-- 2x 可用的课观察次数减半；这条线只对锁 1x 的课按上面的公式成立。450 s 左右 7 次，700 s 左右 8 次。**不把它写成"所有课都 ≤8"**。
+平台事实（锁 1x 的科普类视频课）：
 
-这套流程在「地球历史及其生命的奥秘」上的具体事实（本课程 1.3.x/1.4.x 实测）：
-
-- **外壳与目录**：`mooc2-ans/mycourse/stu?...&pageHeader=1`（章节详情），目录在 `frame_content-zj`，即 `studentcourse` iframe。每行是 `.chapter_item[onclick="toOld(courseId, chapterId, clazzId, 0)"]`，行文本形如 `1.4.1 早期地球的排气作用 2`，尾部数字是未完成任务点数。
-- **进节点与起播可以合并**：在 `studentcourse` 帧里点 `.chapter_item`（按节号过滤），等 `ananas/modules/video/index.html` 帧出现，再静音、点倍速菜单、起播——一次 `browser_run_code_unsafe` 完成；省掉单独一次 click，也没有 ref 失效问题。导航后仍要核对 `chapterId` 与节名。
-- **锁速**：这门课展开倍速菜单只有 `字幕设定/关闭字幕/公网1/公网2/高清`，没有 2x；写 `video.playbackRate=2` 会被播放器改回 1。菜单没有 2x/1.5x/1.25x 时直接记 `rateSource=locked`（预跑 1.2.1 起改用这个值，不再写属性），按 1x 播，不反复试。
-- **弹题**：`li.ans-videoquiz-opt > label > span.tkRadio > input[type=radio]`，点 radio 并回读 checked；提交优先用唯一 id `#videoquiz-submit`（只有类选择器时取文本为「提交」且可见的第一个；同类里还有隐藏的「提交中」，丝绸之路上直接点 `a.ans-videoquiz-submit` 会匹配 2 个锚点）。1.2.1 实测点 `DIV.tkTopic_oper` 不放行、视频不续播；必要时点 `.ans-videoquiz-continue`。`.spanHas`/`.spanNot` 是静态文案（提交前就能看到「回答正确」），不是判定；弹题是否计分页面不给。
-- **测验答案不要读文字**：待作答态的 DOM 文字是混淆字体（形如 `A 惉悻惆惈成敦就惃惄`），任何按可见文字匹配的选答都会失败。只认 `li[qid]` 的 DOM 顺序 + `span[data]` token：单选是 `A`–`D`，判断是整 token `true`/`false`，多选是字母拼接。核对 `input[name=answer<qid>]` 时按 **token 集合**比较——把 `true` 拆成字符再排序会得到 `ertu`，必然误报 `verify-mismatch`。
-- **OCR**：截图用 `f.locator('body').screenshot()`（frame body，整页高度）。Windows 控制台先 `$env:PYTHONIOENCODING='utf-8'; [Console]::OutputEncoding=[System.Text.Encoding]::UTF8`，否则中文乱码、只剩几行。`quiz_panel.py` 的 x 区间是宽屏页面的启发式；932 px 窄页的题面从 x≈39 开始，`100–1100` 会把题面全过滤掉。验收配方直接打印全部 OCR 行（约 25 行），不进面板过滤。
+- **外壳与目录**：`mooc2-ans/mycourse/stu?...&pageHeader=1`（章节详情），目录在 `studentcourse` iframe。
+  每行 `.chapter_item[onclick="toOld(courseId, chapterId, clazzId, 0)"]`，行尾数字是未完成任务点数。
+- **进节点与起播可以合并**：按节号点行 → 等 `ananas/modules/video/index.html` 帧出现 → 静音 → 点倍速菜单 → 起播，
+  一次 `browser_run_code_unsafe` 完成；导航后仍要核对 `chapterId` 与节名。
+- **锁速**：菜单里没有 2x/1.5x/1.25x 时直接记 `rateSource=locked`，按 1x 播，不反复试、不写 `playbackRate` 对抗。
+- **弹题**：点 `li.ans-videoquiz-opt > label > span.tkRadio > input[type=radio]` 并回读 checked；
+  提交优先唯一 id `#videoquiz-submit`（同类里还有隐藏的「提交中」）；`.spanHas`/`.spanNot` 是静态文案、不是判定；
+  答对才关浮层。必要时点 `.ans-videoquiz-continue`。
+- **测验答案不要读文字**：待作答态 DOM 是混淆字体，任何按可见文字匹配都会失败。只认 `li[qid]` 顺序 + `span[data]` token；
+  核对 `input[name=answer<qid>]` 时按 **token 集合**比较（把 `true` 拆字符再排序必然误报）。
+- **OCR**：截图用 `f.locator('body').screenshot()`；Windows 控制台先设 UTF-8，否则中文乱码；
+  窄页不要套用宽屏的 x 区间（会把题面整段过滤掉）。
 - 结果页提交后是明文（我的答案/得分），可复盘；0 分不一定点亮任务点，是否点亮只看目录尾部数字。
 
-## 预跑：证据模式单节点（<运行日期>，1.2.1）
+## 证据模式单节点（只读）
 
-冷启动子 agent，只读 `mcp__browser__`、单标签、最小化，按 `local/private.toml` 的临时 `mode=evidence`（`submit=false`）跑完整节；章节测验只读不提交。
+冷启动子 agent、只读通道、单标签、最小化，使用 `mode=evidence`、`submit=false`；章节测验只读打开、截图和记档，0 选项点击、0 提交、不重开。
 
-| 项 | 实测 |
-|---|---|
-| 视频 | 498.32 s，1x（菜单无倍速，`locked`），静音，`ended=true` |
-| 弹题 | t=343.26 s；「地球作为太阳系的独立行星形成于（）亿年前」选 D（46）；无判分，`low_confidence` |
-| 字幕 | `allsubtitle` 返回 HTTP 200 + `[]`；本视频**没有字幕轨**，弹题和测验都没有原文可支撑 |
-| 章节测验 | workId 900001，5 题；只读打开、OCR；**0 选项点击 / 0 提交 / 未重开**；`decision=do-not-submit` |
-| 任务点 | 1.2.1 行尾 `2 → 1`；课程总数 240 → 239；剩下 1 是未提交的测验 |
-| 成本 | **37 次调用 / 2.29M token / 722 s**（其中浏览器 21 次） |
-| 审计 | `session_cost.py --audit-submit` = clean；`check_evidence.py --require-readonly` = OK |
+- 用 `check_evidence --require-readonly` 与 `session_cost --audit-submit` 验证；回目录只核对本次已完成的视频任务点。
+- 避免目录帧反复试探、弹题按钮试错与回目录重进；顺序见 [单节点快速配方](quickstart.md)。
+- 打开答题页会生成 `workAnswerId`，平台可能记为「已查看」（无分数、非已完成）。若学习记录页新开标签，看完立即关闭，不再重开答题页。
+- 读取 `#addTimes`、`#limitWorkSubmitTimes`，记录有无非静态 start/answer 请求，并在离开后核对任务点。已观察到打开不消耗提交次数的情形，不能据此保证限次=1 的课程也相同。
+- 只读前先读限次说明；不想留下「已查看」记录就不要打开。弹题判分、无字幕答案正确性等未证实信息不写成结论。
 
-37 次里只有 3 次观察器 + 2 次弹题 + 1 次起播是必需动作，其余是**可避免的探索**：
+## 通用机制
 
-1. 目录帧试探 5 次：`browser_evaluate` 读不到 `mooc2-ans` 帧（`document.domain` 隔离），改用 `browser_run_code_unsafe` 的 `page.frames()`。→ 快速配方第 1 步直接用后者。
-2. 弹题 5 次：先按旧配方点 `DIV.tkTopic_oper`，浮层不动；又探候选、再点 `a.ans-videoquiz-submit` 才放行。→ 配方改成直接点提交（现在优先唯一 id `#videoquiz-submit`），一次读题 + 一次「作答+续播」。
-3. 回目录再重进 6 次：视频完先回目录核对，`page.goBack()` 又回不去，改用 `a.subBack`；再进节点开测验。→ 配方固定「视频 → 弹题 → 测验 → 最后回目录一次」。
-4. 冷启动读文档/仓库 11 次：`references/quickstart.md` 就是为了把这部分压到 1–2 次。
+已核实的通道事实：技能发现与安装根；文件系统探针；`pwsh` 实为 Windows PowerShell 5.1（前台超时转后台 job、
+大输出截断并给完整路径）；`web_fetch` 无登录态。浏览器能力来自本机 profile 里 `insert` 的 Playwright MCP
+（每条通道独立 `--user-data-dir` 与 output 目录），不是 harness 内置浏览器。
 
-**这次预跑证明的**：证据模式可以完整看完一节、弹题可答、测验可只读取证、不提交、平台任务点只掉视频那一项。
-平台“学习记录 → 章节测验详情”（`stat2-ans`）给出的状态：1.2.1、1.2.2 都是**已查看**、无分数；1.2.3 在 23:00 时还是**未查看**，23:44 只读打开答题页后也变成了**已查看**。N/N 的“已完成”里不含这三节。这个详情页会**新开标签**，看完立即关闭，不要点“查看”重开测验；它没有作答次数列。
+浏览器可执行节点播放、题面取证和授权范围内的测验流程；每步用新加载的课程页核对任务点。已整理的机制：
 
-1.2.3 的答题页还给了隐藏字段：`#addTimes = 0`、`#limitWorkSubmitTimes = 100`、`#workAnswerId = 900002`，没有非静态的 start/answer 请求；离开后任务点仍是 2。**打开答题页本身没有消耗提交次数**（至少这个 quiz/字段语义），但会留下“已查看”。
+- 节点宏一次 `evaluate` 可完成「定位嵌套帧 + 身份核对 + 静音 + 起播」，事件观察器同调用内 2 秒自检、弹题或 `ended` 早退。
+- 字幕取证：`subtitle_evidence.py fetch/find/gate` 落盘 SRT 并按原话取证；`quiz_ocr.py` 读题面并标低置信行。
+- 四个通道问题：课程卡片 href 是相对 `v24.chaoxing.com` 的（要按 `contentDocument.baseURI` 解析）；
+  `mooc2-ans` 外层 `stu` 页的 iframe 被 `document.domain` 隔离；帧内资源条目要用 `contentWindow.performance`；
+  窗口最小化要按真实 OS 状态 `ShowWindow` 复核。
+- 多选：隐藏框字母来自 `span[data]`，与显示字母不同序；做法是「读 label/data/aria-checked → 只点差集 → 重读核对」。
+- 无原文时按推断作答必须标 low-confidence；门禁只证明「词在原文」，不证明集合完整
+  （「全部连接/全部包括」这类题不要全选）。
+- 平台任务点计数有延迟，交卷后可能自补；不要回头重看视频。
+- `browser_run_code_unsafe` 只允许读 `~/.dsh` 下两个根目录，工作区脚本加载不了。
+- OCR 侧 `quiz_panel.py` 按题区过滤、`crop_ocr.py` 裁剪放大重识别。
 
-**仍然没有证明的**：限次=1 的课是否也同样不消耗（只测了 `limitWorkSubmitTimes=100` 的 1.2.3）；弹题是否计分（页面无判定）；无字幕时测验答案的正确性（没有提交）。这些不写成结论。
-
-复测（同日，1.2.2，409.0 s）：用 [单节点快速配方](quickstart.md) 的 6 个代码块，冷启动 **19 次调用 / 0.80M token / 浏览器 7 次 / 任务点 2→1**，`check_evidence --require-readonly` OK、`--audit-submit` clean。
-比 1.2.1 少 18 次调用、少 1.49M token；少掉的正是目录帧试探、弹题按钮试错和回目录重进。剩余 11 次非浏览器调用是读配置/文档、跑校验、写证据和汇报。
-
-## 实测结论（<运行日期>）
-
-已核实的通道事实：技能发现与安装根；文件系统探针；`pwsh` 实际为 Windows PowerShell 5.1，前台超时转后台 job，大输出截断并给完整路径；`web_fetch` 无登录态。浏览器能力来自本机 profile 里 `insert` 的 Playwright MCP（<运行日期> 时是一条 `mcp-browser`、25 个工具；<运行日期> 起 `mcp-browser` + `mcp-browser2`；<运行日期> 起第三条 `mcp-browser3` 用于 account-c，`mcp-browser2` 退役），不是 harness 内置浏览器。
-
-已实战通过（<运行日期>，学习通，Chrome 与 Edge 都验证过）：3.2、3.3、3.4、4.2 四个整节点的章节测验首次 100 分；4.1 为 80 分、4.3 为 66.6 分（各有题目因缺少原文支撑答错，按规则未重开、未重交）；目录 14/84→26/84，每一步都用新加载的课程页核对。3.3、4.2、4.3 全程在 Windows 原生最小化（`IsIconic`）下完成，含播放、选项填写、弹题与章节测验提交、刷新保存。
-
-<运行日期>，脚本化后的 5.1 节点（<时长>秒）一次跑通，目录 26→N/N：节点宏用一次 `evaluate` 完成「定位嵌套帧 + 三处身份核对 + 静音 + 点大播放键 + 确认起播」，事件观察器在同一调用里 <时长>秒自检，<时长>秒弹题早退返回，答完后 `ended` 早退；`subtitle_evidence.py fetch` 落盘 181 条字幕，`find`/`gate` 给出 00:04:16–00:04:28 与 00:08:46–00:08:54 两段原话，弹题与两道判断题全部命中，章节测验首次 <成绩>分（workId 900003）；`quiz_ocr.py` 把两道题干解到 0.95，头部 0.67–0.80 的行如标注为低置信。这一段同时修掉四个通道问题：课程卡片 href 是相对 `v24.chaoxing.com` 的，手拼 `i.chaoxing.com` 会 404，必须用 `contentDocument.baseURI` 解析出的绝对地址；`mooc2-ans` 外层 `stu` 页的 iframe 被 `document.domain` 隔离，读不到「已完成任务点」，要直接用页面自己给出的 `studentcourse` 地址加载目录；帧内资源条目要用 `contentWindow.performance`；首次出现的可见 Chrome 窗口并未最小化，`IsIconic` 复核后守卫必须补一次 `ShowWindow(SW_MINIMIZE)`。
-
-同日 5.2（431.06 秒）按「节点调用预算」的紧凑序列只用了 **19 次调用**就走完「进节点 → 视频到尾 → 弹题 → 章节测验读完并判完」，目录 28→29/84；弹题 241.276 秒，答案由 00:02:38–00:02:59 的原文支撑。章节测验先被闸门拦住：Q2「创业思维是一种（行动导向）的方法，体现了（实用主义）的哲学思想」在本节点字幕里没有任何对应原文（5.2 字幕不含 哲学/实用/理性/前提/事先/设定）；用户明确授权「无原文时按推断作答」后按 effectuation 的学科知识补答并在记录里标 low-confidence，最终 **第1次作答 100 分**（workId 900004），目录 30/84。多选状态这一步踩了坑并修正：隐藏框字母来自 `span[data]`（乐高显示 A、data=D），按显示字母点会连续选错，改为「读 label/data/aria-checked → 只点差集 → 重读核对」后一次通过。
-
-<运行日期> <时间>，5.3「人工智能思维」（<时长>秒，objectid `00000000000000000000000000000000`）一次跑通，目录 30→N/N：弹题 <时长>秒，答案由 00:03:49.560–00:03:56.879「人工智能算料数据它指向的是预测优化」支撑；章节测验 **第1次作答 <成绩>分（workId 900005、workAnswerId 900006）**。Q1 用 00:01:09.519–00:01:24.319「人工智能算法它高度关注因果关系」，Q2 用 00:01:05.599–00:01:15.640「人工智能三驾马车 算法 算力 算料」；Q3 在 N/N/5.2 字幕里都没有原文，按王国红等（外国经济与管理 2017, 39(4): 3-14）「嵌入创业情境中……促进团队内部知识的组织、分配与加工」答 CD，节点记录标 low-confidence。三题都把显示字母和 `span[data]` 分开核对：Q1 显示 C（因果关系）而隐藏值是 A，Q2 隐藏值 BCA、Q3 隐藏值 AC——按显示字母点会全错，单选也一样。
-
-
-
-<运行日期>收尾：从 N/N 跑到 **N/N**，26 个节点（5.4、5.5、6.1–6.4、7.1–7.4、8.1–8.4、9.1–9.2、10.1–10.2、11.1–11.4、12.1–12.4）全部完成，其中 24 个节点章节测验首答 <成绩>分；5.5 为 83.3（多选题「少选」只得一半分），12.4 为 <成绩>分（「三创」题选了创新/创造/创业，正确答案是创新/创优/创业，已提交不可改）。按节统计：26 段视频共约 6.4 小时、26 次弹题全部答对、26 次章节测验全部提交；目录复核从 N/N 到 N/N，无待完成任务点。调用成本：单节点从最早 42 次压到 13–17 次（宏内合并字幕发现、观察器直接回传题干、提交时回读角标、每题一次 gate）。新增两个降低读题成本的小工具：`quiz_panel.py` 按题区 x 范围过滤整页 OCR（57 行压到约 20 行），`crop_ocr.py` 在题干被漏识时按 OCR 行锚点裁剪题区并 2 倍放大重识别（7.2 Q1 靠它补出题干）。新确认的坑：平台任务点计数有延迟（10.x 后目录少 <成绩>分，11.4 交卷后自补，不要回头重看视频）；「三创」是创新/创优/创业；`browser_run_code_unsafe` 只允许读 `~/.dsh` 下的两个根目录，工作区脚本加载不了。
-
-通道形态区别：本路径是独立浏览器窗口（`--browser chrome` 或 `--browser msedge`，各自独立 `--user-data-dir`），不是 Codex/ZCode 的内置 IAB。因此 Codex 的「面板尺寸变化 / harness 最小化」清单不适用于本路径；最小化按真实 OS 窗口状态验收，尺寸只影响自身布局。**一个账号一条通道、一个浏览器、一个标签**：同一账号开两个标签/两个执行器才会触发多终端提醒；不同账号各用一条通道时怎么并发、什么时候两边都停，见 [多账号运行](multi-account.md)。换浏览器就改 `--browser` 与 `--user-data-dir` 两处。首次登录后课程列表 iframe 可能返回一次「加载失败」404，重载页面即可恢复。改这一行会让 MCP 重载并关闭浏览器，登录态不保留，所以配置改动集中在节点边界。
+通道形态区别：独立浏览器窗口（`--browser chrome` 或 `msedge`，各自独立 `--user-data-dir`），不是内置 IAB；
+最小化按真实 OS 窗口状态验收。**一个账号一条通道、一个浏览器、一个标签**：同一账号开两个标签/两个执行器
+才会触发多终端提醒；不同账号各用一条通道时怎么并发、什么时候两边都停，见 [多账号运行](multi-account.md)。
+换浏览器就改 `--browser` 与 `--user-data-dir` 两处。首次登录后课程列表 iframe 可能返回一次「加载失败」404，
+重载页面即可恢复。改这一行会让 MCP 重载并关闭浏览器，登录态不保留，所以配置改动集中在节点边界。
 
 ## 登录态与重载
 

@@ -14,6 +14,19 @@ PUBLIC = ('SKILL.md', 'README.md', 'ACCEPTANCE.md', 'NOTICE', 'LICENSE', '.gitig
           'requirements.txt', 'requirements-ocr.txt', 'references', 'scripts', 'tests')
 LOCAL_METADATA = ('homework-profile.md', 'legacy-paths.json', 'runtime.json')
 
+# Platform instance ids (workId / workAnswerId / courseId / clazzId / chapterId) are long digit runs.
+# A real export once shipped one because the scan only knew paths, phones and emails; keep this rule
+# strict and write fixtures as 'work-example'-style placeholders instead.
+PLATFORM_ID = re.compile(r'(?<!\d)\d{8,12}(?!\d)')
+
+
+def _looks_like_date(token):
+    """YYYYMMDD used in run directory names is not a platform id."""
+    if len(token) != 8:
+        return False
+    year, month, day = int(token[:4]), int(token[4:6]), int(token[6:8])
+    return 1990 <= year <= 2100 and 1 <= month <= 12 and 1 <= day <= 31
+
 
 def files():
     result = []
@@ -44,6 +57,10 @@ def public_scan(entries, denylist):
         ):
             if re.search(pattern, text):
                 findings.append({'path': str(relative), 'kind': label})
+        for token in PLATFORM_ID.findall(text):
+            if _looks_like_date(token):
+                continue
+            findings.append({'path': str(relative), 'kind': 'platform-instance-id'})
         for value in denylist:
             if value in text:
                 findings.append({'path': str(relative), 'kind': 'local-denylist-match'})

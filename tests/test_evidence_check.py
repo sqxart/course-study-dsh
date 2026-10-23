@@ -19,7 +19,7 @@ BASE = {
     'kind': 'pre-run-evidence',
     'mode': 'evidence',
     'authorization': {'source': 'local/private.toml', 'submit': False, 'redo_once': False},
-    'course': {'title': '地球历史及其生命的奥秘', 'course_id': 260000001},
+    'course': {'title': '地球历史及其生命的奥秘', 'course_id': 260001},
     'section': {'code': '1.2.1', 'title': '示例章节'},
     'video': {
         'duration_seconds': 300.0, 'rate': 1, 'rate_source': 'locked', 'ended': True,
@@ -27,7 +27,7 @@ BASE = {
     },
     'popup': {'question': '...', 'selected': 'D', 'low_confidence': True, 'evidence_status': 'insufficient-evidence'},
     'quiz': {
-        'work_id': '900001', 'submitted': False, 'decision': 'do-not-submit',
+        'work_id': 'work-example', 'submitted': False, 'decision': 'do-not-submit',
         'options_clicked': 0, 'submit_clicked': 0, 'reopened': False,
     },
     'platform': {'toc_before': {'task_points': 2}, 'toc_after': {'task_points': 1}},
@@ -113,7 +113,7 @@ class EvidenceCheckTest(unittest.TestCase):
         self.assertTrue(any('platform_status' in item for item in warnings))
 
     def test_opened_quiz_without_platform_status_warns(self):
-        _, warnings = check.validate(record(quiz__work_answer_id='900002'))
+        _, warnings = check.validate(record(quiz__work_answer_id='answer-example'))
         self.assertTrue(any('platform_status' in item for item in warnings))
 
     def test_platform_status_not_required_when_quiz_closed(self):
