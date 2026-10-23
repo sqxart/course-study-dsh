@@ -63,6 +63,19 @@ class NormalizeTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             popquiz.normalize_capture(capture(section='第一节'))
 
+    def test_multi_select_answer_accepts_several_keys(self):
+        node = popquiz.normalize_capture(capture(qtype='multi', my_answer='AB'))
+        self.assertEqual(node['qtype'], 'multi')
+        self.assertEqual(node['my_answer'], 'AB')
+
+    def test_multi_select_answer_must_match_options(self):
+        with self.assertRaises(ValueError):
+            popquiz.normalize_capture(capture(qtype='multi', my_answer='ABC'))
+
+    def test_single_select_rejects_two_keys(self):
+        with self.assertRaises(ValueError):
+            popquiz.normalize_capture(capture(qtype='single', my_answer='AB'))
+
 
 class CheckTest(unittest.TestCase):
     def test_clean_capture_passes(self):

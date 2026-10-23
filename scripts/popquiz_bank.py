@@ -61,10 +61,16 @@ def normalize_capture(capture):
     if not options:
         raise ValueError('no options')
     keys = [option['key'] for option in options]
+    qtype = str(capture.get('qtype') or 'single')
+    if qtype not in QTYPES:
+        raise ValueError('bad qtype {0!r}'.format(qtype))
     mine = capture.get('my_answer')
     mine = str(mine).strip().upper() if mine not in (None, '') else None
-    if mine is not None and mine not in keys:
-        raise ValueError('my_answer {0!r} is not an option'.format(mine))
+    if mine is not None:
+        # A multi-select popup answers several letters at once ("AB"), single ones only one.
+        picked = [key for key in keys if key in mine] if qtype == 'multi' else ([mine] if mine in keys else [])
+        if not picked or ''.join(picked) != mine:
+            raise ValueError('my_answer {0!r} does not match the options {1}'.format(mine, keys))
     verdict = str(capture.get('verdict') or 'unknown')
     if verdict not in VERDICTS:
         raise ValueError('bad verdict {0!r}'.format(verdict))
@@ -79,9 +85,6 @@ def normalize_capture(capture):
     status = str(capture.get('evidence_status') or 'none')
     if status not in EVIDENCE:
         raise ValueError('bad evidence_status {0!r}'.format(status))
-    qtype = str(capture.get('qtype') or 'single')
-    if qtype not in QTYPES:
-        raise ValueError('bad qtype {0!r}'.format(qtype))
     segment = capture.get('segment')
     segment = int(segment) if isinstance(segment, (int, float, str)) and str(segment).strip().isdigit() else 0
     return {
