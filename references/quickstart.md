@@ -7,6 +7,11 @@
 视频和弹题照常完成，弹题没有原文时按学科知识作答并标 `low-confidence`。
 通道与更长的平台说明见 [DSH 运行说明](dsh-runtime.md)、[学习通](chaoxing.md)；本文件只给可直接粘贴的代码。
 
+**批量跑多节时不要在主会话里逐节点驱动**：用 `workflow` 串行链、**3 节一个子 agent**
+（实测 1.22 M token/节；单节点新会话 0.43–0.74 M/节；1 节/agent 反而更贵到 1.54 M/节），
+驱动预生成后传 `filename`；主会话只做拆包、校验、记账。细则见 [SKILL.md](../SKILL.md) 的
+「批量节点：用子 agent」。
+
 ## 0. 先决条件
 
 - 浏览器已在课程目录页（`mooc2-ans.chaoxing.com/mooc2-ans/mycourse/stu?...`），已登录，单标签。
