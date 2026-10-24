@@ -1,21 +1,20 @@
 """Draw up the per-course section plan the question bank is expected to cover.
 
-Two local records disagree about the past: the run ledger (`progress.json`) knows every
-node that was completed, while the evidence files are missing the ones an overwriting
-write destroyed. So the ledger is the coverage baseline and evidence is only used to
-attach `work_id` / `score` / `question_count` for a later cross-check.
+Use the run ledger (`progress.json`) as the section-coverage baseline. Evidence files
+can add `work_id` / `score` / `question_count` for a later cross-check; missing evidence
+does not remove a ledger section from the expected plan.
 
     runs/<task>/expected-<key>.json   sorted section codes — the coverage baseline
     runs/<task>/plan-<key>.json       per-section record: account, title, evidence values
 
 Usage:
     python scripts/bank_plan.py \\
-      --plan silk-road=account-a@runs/full-20261021/progress.json \\
-      --plan course-example=account-c@runs/full-20261021/progress.json \\
-      --plan lang-culture=account-c@runs/lang-culture-20261021/progress.json \\
-      --course 无人驾驶车辆=course-example \\
-      --evidence runs/full-20261021 runs/lang-culture-20261021 \\
-      --out-dir runs/bank
+      --plan example-course=account-example@runs/example/progress.json \\
+      --plan second-course=other-account@runs/other/progress.json \\
+      --plan third-course=other-account@runs/third/progress.json \\
+      --course 示例课程=example-course \\
+      --evidence runs/example runs/other \\
+      --out-dir runs/<task>
 """
 
 import argparse

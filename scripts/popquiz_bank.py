@@ -10,7 +10,7 @@ carries one pointer line per section.
 Capture shape (one file per popup, `<section>-<n>.json`):
 
     {"schema_version": 1, "kind": "video-quiz-capture", "course": "earth-history",
-     "account": "account-a", "channel": "mcp__browser", "section": "1.4.2",
+     "account": "account-example", "channel": "mcp__browser", "section": "1.4.2",
      "segment": 0, "qtype": "single",
      "stem": "...", "options": [{"key": "A", "text": "..."}],
      "my_answer": "B", "verdict": "correct", "revealed_correct": null,
@@ -20,7 +20,7 @@ Capture shape (one file per popup, `<section>-<n>.json`):
 Usage:
     python scripts/popquiz_bank.py check runs/<task>/popquiz/<course>/1.4.2-0.json
     python scripts/popquiz_bank.py build --popquiz-dir runs/<task>/popquiz/<course> \\
-        --course earth-history --title 地球历史及其生命的奥秘
+        --course example-course --title 示例课程
 """
 
 import argparse

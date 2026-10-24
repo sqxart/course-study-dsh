@@ -5,8 +5,8 @@ download itself needs no second browser visit: the `.srt` URLs live on the media
 Sections whose capture has no subtitle entry are simply skipped — the review document
 marks those `本节无字幕`.
 
-    python scripts/bank_subs.py --nodes runs/bank/nodes/course-example \\
-        --out runs/bank/subs/course-example
+    python scripts/bank_subs.py --nodes runs/<task>/nodes/<course> \\
+        --out runs/<task>/subs/<course>
 """
 
 import argparse
