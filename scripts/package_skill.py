@@ -9,7 +9,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parent.parent
 SKILL_NAME = 'course-study-dsh'
-VERSION = '1.0.16'
+VERSION = '1.0.17'
 PUBLIC = ('SKILL.md', 'README.md', 'ACCEPTANCE.md', 'NOTICE', 'LICENSE', '.gitignore', 'install.ps1', 'private.toml.example',
           'requirements.txt', 'requirements-ocr.txt', 'references', 'scripts', 'tests')
 LOCAL_METADATA = ('homework-profile.md', 'legacy-paths.json', 'runtime.json')

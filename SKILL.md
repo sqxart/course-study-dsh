@@ -50,6 +50,12 @@ Harness 的通道事实、已实测范围与调用预算在 [DSH 运行说明](r
 - **提交后明文可读**：结果页会显示「我的答案 / 得分」，字体混淆只在待作答态；用它补题库、做复盘。
   「正确答案」是否出现由教师决定，实测两门课都没开，所以题库按 `correct: null` 记，不猜（见 [题库与复习文档](references/bank.md)）。
 - **控件有两代**：旧播放器弹题要点 `input[type=radio]`（点 `li` 无效，会提交空答案）；v24 测验页要点 `li[qid]`。进页面先探骨架，别套用上一页的经验。
+- **页签按文字点，不按 id**：多数节是 `1视频 / 2章节测验`，但**每章第一节**常是 `1学习目标 / 2视频 / 3章节测验`。
+  固定点 `li#dct2` 会点到「视频」，然后一直等不到答题帧。按 innerText 含「视频 / 章节测验」匹配。
+- **单次浏览器调用预算 ≤ 240 s**（`toolCallTimeoutMs` 300 s 再留 60 s 收尾）。撞超时先读状态、不要重跑起播脚本；
+  超时后视频往往还在播，重跑会把同一节从头再放一遍。
+- **完成只认平台，且要能对上时间**：目录行尾点数 + 「学习记录 → 章节任务点 → 详情」的完成时间。
+  看到「几分钟就结掉一个二十分钟的视频」先查这两处，别急着当异常或当成功。
 - 未满分的章节测验最多重做 1 次（`private.toml` 的 `redo_once`），重走完整流程，直到点亮或余量用尽。
 
 ## 批量节点：用子 agent，不要在主会话里逐个驱动
@@ -99,6 +105,9 @@ Harness 的通道事实、已实测范围与调用预算在 [DSH 运行说明](r
   平台不公布弹题正确答案，`revealed_correct` 留空、不猜；verdict 只按「浮层是否关闭」判（答错不关）。
 - [题库计划](scripts/bank_plan.py)：从 run ledger 取「应该有测验的节号」，从 evidence 补 `work_id`/分数，产出 `expected-*.json` 与 `plan-*.json`。
 - [节点驱动生成](scripts/bank_node_js.py)：把 `references/bank.md` 里的取数驱动实体化成每节一个 JS，交浏览器 `filename` 直载，免去每节点粘贴 4 KB 脚本。
+- [拆包落盘](scripts/split_bundles.py)：子 agent 只写一个 `bundles/<节>.json`（capture + popquiz + evidence），
+  批末由主会话拆成 `captures/<course>/`、`popquiz/<course>/`、`nodes/evidence-*.json`，省掉每节 2 次写入；
+  同时把「行尾已无点数 span」的 `task_points=null` **归一化成 0** 并补一条 deviations（否则 `check_evidence` 会当类型错误）。
 - [字幕抓取](scripts/bank_subs.py)：按 capture 里记下的字幕地址批量下载 SRT，供知识总结使用。
 - [文本留存](scripts/media_keep.py)：看完一个视频节后，把 `evidence.json` 里的 `subs`（或签名 `mp4`）落成
   `subs/<course>/<节>.srt`；没有字幕且 `[asr] enabled` 时才转写成 `asr/<course>/<节>.txt`。

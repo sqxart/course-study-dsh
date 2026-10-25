@@ -18,6 +18,10 @@
 - 只用当前账号那条通道（`mcp__browser__*` / `mcp__browser2__*` / `mcp__browser3__*` 之一，见 [多账号运行](multi-account.md)），不要跨账号混用；不要用 `browser_evaluate` 去读 `mooc2-ans` 目录帧——它被 `document.domain` 隔离，读不到。
   目录和播放器都在 `page.frames()` 里，用 `browser_run_code_unsafe` 的 `page`。
 - 观察器单次 **175 秒**（本机 `toolCallTimeoutMs=300000`），返回 `timeout` 就续一段，不算失败。
+  跑长视频课可以放宽，但**上限是 `toolCallTimeoutMs − 60 s`（本机 240 s）**：进节点、等帧、收尾还有 20–60 秒开销，
+  280 s 会稳定撞 300 s 超时。超时后视频通常还在页面里继续播——先读状态，**不要重跑起播脚本**。
+- **页签按文字点**：多数节 `1视频 / 2章节测验`，每章第一节常是 `1学习目标 / 2视频 / 3章节测验`；
+  固定点 `li#dct2` 会点错，按 innerText 含「视频 / 章节测验」匹配。
 - **别让浏览器抢你的前台。** 跳页/开新标签会把 DSH 那个浏览器窗口顶到最前，打扰用户。开工时在后台挂一次：
 
   ```powershell
