@@ -29,10 +29,10 @@ class SplitBundlesTests(unittest.TestCase):
         self.out = Path(self.temp.name)
 
     def test_writes_capture_evidence_under_course_dir(self):
-        result = split.split_one(bundle(), self.out, course='shufa')
+        result = split.split_one(bundle(), self.out, course='course-example')
         self.assertTrue(result['ok'])
         self.assertEqual(sorted(result['written']), ['capture', 'evidence'])
-        capture = json.loads((self.out / 'captures' / 'shufa' / '7.4.json').read_text(encoding='utf-8'))
+        capture = json.loads((self.out / 'captures' / 'course-example' / '7.4.json').read_text(encoding='utf-8'))
         self.assertEqual(capture['section'], '7.4')
         evidence = json.loads((self.out / 'nodes' / 'evidence-7.4.json').read_text(encoding='utf-8'))
         self.assertEqual(evidence['section']['code'], '7.4')
@@ -71,9 +71,9 @@ class SplitBundlesTests(unittest.TestCase):
         bundles = self.out / 'bundles'
         bundles.mkdir()
         (bundles / '7.4.json').write_text(json.dumps(bundle(), ensure_ascii=False), encoding='utf-8')
-        code = split.main(['--bundles', str(bundles), '--course', 'shufa'])
+        code = split.main(['--bundles', str(bundles), '--course', 'course-example'])
         self.assertEqual(code, 0)
-        self.assertTrue((self.out / 'captures' / 'shufa' / '7.4.json').exists())
+        self.assertTrue((self.out / 'captures' / 'course-example' / '7.4.json').exists())
 
     def test_cli_reports_bad_bundle(self):
         bundles = self.out / 'bundles'

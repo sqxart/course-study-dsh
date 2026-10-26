@@ -22,6 +22,8 @@
   280 s 会稳定撞 300 s 超时。超时后视频通常还在页面里继续播——先读状态，**不要重跑起播脚本**。
 - **页签按文字点**：多数节 `1视频 / 2章节测验`，每章第一节常是 `1学习目标 / 2视频 / 3章节测验`；
   固定点 `li#dct2` 会点错，按 innerText 含「视频 / 章节测验」匹配。
+- **`ended` 之后先停留 20–30 秒**再切页签或回目录：平台写观看进度有延迟，立刻切走可能这一节白看
+  （本地 `ended=true`、测验满分，行尾仍剩 1 点，只能重播整段补记）。
 - **别让浏览器抢你的前台。** 跳页/开新标签会把 DSH 那个浏览器窗口顶到最前，打扰用户。开工时在后台挂一次：
 
   ```powershell
@@ -340,6 +342,15 @@ python scripts/toc_status.py runs/<task>/toc-after.yml --prefix 1.2
 ```
 
 快照落在 MCP 的输出目录（`%USERPROFILE%\.dsh\profiles\desktop` 之类），先 `Copy-Item` 到本次 `runs/`。
+
+驱动自己落盘的 `toc-*.json`（`{"rows":[{"sec","name","pt"}]}`）不用转快照，直接当闸门：
+
+```powershell
+python scripts/toc_status.py --rows runs/<task>/toc-final.json --fail-if-unfinished
+```
+
+> 刚提交完读到的那份 `toc-after` 不算数：点数 span 可能还没渲染掉。**批末重读一次目录**，
+> 目标节 `pt` 全为 `null`、`UNFINISHED_TASKS=0` 才算这批真清了。
 
 ## 6. 先写证据，再汇报
 

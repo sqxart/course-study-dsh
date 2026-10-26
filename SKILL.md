@@ -35,6 +35,8 @@ Harness 的通道事实、已实测范围与调用预算在 [DSH 运行说明](r
 
 - 进节点先探测：读 `video.playbackRate` 当前值和播放器的倍速菜单项（`span.vjs-menu-item-text`，通常是 `2x / 1.5x / 1.25x / 1x`）。
 - **优先点菜单项**，那是官方动作；菜单点不动才退回 `video.playbackRate = value`，并在节点记录里注明"属性写入"而不是"菜单选择"。
+- 倍速按钮常**起播后**才可见：先静音起播，再点按钮读菜单；菜单为空才记 `locked`。
+  同一门课不同节也可能不同（实测一门课只有开头两节能到 `2x` / `1.5x`，其余全锁 1x）——**逐节记录 `rate_source`，不要给整门课贴一个 locked**。
 - 默认取**平台允许的最高档**；`rate = 1` 可配置回保守模式（有些课倍速会判定异常）。
 - 锁速课程的 `playbackRate` 恒为 1 且菜单隐藏，接受平台限制，不要用会写死 2x 的旧保活脚本；菜单里没有 2x/1.5x/1.25x 时记 `rate_source=locked`，不要去写属性再被改回来。
 - 观察器的**总等待预算**按实际速率缩放：`总预算 ≈ 视频剩余秒数 / rate`；但**单次调用仍只跑 175 秒**并带 `timeout` 返回，避免长循环挂死唯一一次调用。
@@ -56,6 +58,10 @@ Harness 的通道事实、已实测范围与调用预算在 [DSH 运行说明](r
   超时后视频往往还在播，重跑会把同一节从头再放一遍。
 - **完成只认平台，且要能对上时间**：目录行尾点数 + 「学习记录 → 章节任务点 → 详情」的完成时间。
   看到「几分钟就结掉一个二十分钟的视频」先查这两处，别急着当异常或当成功。
+- **单次读到的清零不算数**：刚提交完回目录时，点数 span 可能还没渲染掉就消失了；
+  批末必须**重读一次目录**，并用行内 `.catalog_state`（`icon_yiwanc`）/`knowledgeJobCount` 交叉验证，再把它记成已清。
+- **视频本地播完 ≠ 平台记账**：`ended=true`、测验满分，目录行却仍剩 1 点、`stat2-ans` 也少算——平台没把观看进度写库。
+  修法是**重播整段视频**，播完在页面**停留 ≥25 s** 再切页签；补记只重播，不重开测验、不二次提交。
 - 未满分的章节测验最多重做 1 次（`private.toml` 的 `redo_once`），重走完整流程，直到点亮或余量用尽。
 
 ## 批量节点：用子 agent，不要在主会话里逐个驱动
@@ -74,6 +80,8 @@ Harness 的通道事实、已实测范围与调用预算在 [DSH 运行说明](r
 - 每批开跑前先**批量预生成这一批的驱动**；批末由主会话统一跑
   `split_bundles.py` → `quiz_bank.py check/build` → `popquiz_bank.py check/build` → `knowledge_doc.py build`，
   不要把这些校验塞进每个节点 agent（实测每节多 3 次调用）。
+- **批末再读一次目录**（新读，不要用这批开始时那份），对账 `toc_status.py --rows` 与本批 evidence；
+  有「账本已清、目录还剩点」的节先查 `stat2-ans`，再决定重播还是补做。对账完再开下一批。
 - 并发上限由 harness 与模型决定，不是技能常量；`subagent limit reached` 是容量信号，减并发重跑即可。
 
 ## 全程保留的边界
@@ -96,7 +104,8 @@ Harness 的通道事实、已实测范围与调用预算在 [DSH 运行说明](r
 - [裁剪重识别](scripts/crop_ocr.py)：题干漏识时按 OCR 行锚点裁剪并放大重识别；`--auto` 按题号自动定锚点。
 - [读取兜底](scripts/ocr_guard.py)：题干过短、为空或括号未闭合时自动判定并触发重识别，`--dry-run` 只看判定。
 - [作答预检](scripts/option_coverage.py)：多选提交前核对每个选项的独特词是否在原文出现；枚举题找同一 cue 的并列项，缺原文只作警告。
-- [目录状态](scripts/toc_status.py)：从一次目录快照读出每节的未完成任务点数，`--fail-if-unfinished` 可当验收闸门。
+- [目录状态](scripts/toc_status.py)：从一次目录快照读出每节的未完成任务点数，`--fail-if-unfinished` 可当验收闸门；
+  `--rows runs/<task>/toc-final.json` 直接吃驱动落盘的 TOC dump，批末和结项都用它。
 - [会话成本](scripts/session_cost.py)：读本次会话日志，分开报告输入 / 缓存读 / 输出与每次工具调用的体积，用来核对"每节点 ≤1.5M token"这条线；`--audit-submit` 扫描工具调用里的测验提交选择器。
 - [证据检查](scripts/check_evidence.py)：按 `state.md` 的 evidence 结构核对一次节点记录；证据模式默认要求 `submitted=false`，`--require-readonly` 再加"0 选项点击 / 0 提交点击"。
 - [题库归一化](scripts/quiz_bank.py)：把结果页 capture 校验、合并成 `knowledge/<course>/bank.json` + `bank.md`；`check` 单节自检，`build` 带 `--expected` 报覆盖率缺口，`--popquiz-index` 给每节加一行指向 `popquiz.md`。

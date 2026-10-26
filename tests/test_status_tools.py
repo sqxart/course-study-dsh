@@ -93,6 +93,68 @@ class TocStatusTest(unittest.TestCase):
             self.assertEqual(code, 2)
 
 
+ROWS = {
+    'rows': [
+        {'sec': '1.1', 'name': '甲', 'pt': None},
+        {'sec': '1.2', 'name': '乙', 'pt': '2'},
+        {'sec': '1.3', 'name': '丙', 'pt': 1},
+        {'sec': '1.4', 'name': '丁', 'pt': '0'},
+        {'sec': '1.5', 'name': '戊', 'pt': '1个待完成任务点'},
+        {'sec': '', 'name': '第一章 标题行'},
+        {'sec': '1.5', 'name': '戊（重复行）', 'pt': 4},
+    ]
+}
+
+
+class TocRowsTest(unittest.TestCase):
+    def test_null_and_zero_mean_clear(self):
+        by_code = {s['code']: s for s in toc.parse_rows(ROWS)}
+        self.assertEqual(by_code['1.1']['unfinished'], 0)
+        self.assertEqual(by_code['1.4']['unfinished'], 0)
+
+    def test_int_and_labelled_text_are_read(self):
+        by_code = {s['code']: s for s in toc.parse_rows(ROWS)}
+        self.assertEqual(by_code['1.2']['unfinished'], 2)
+        self.assertEqual(by_code['1.3']['unfinished'], 1)
+        self.assertEqual(by_code['1.5']['unfinished'], 1)
+
+    def test_untitled_rows_are_skipped_and_duplicates_collapsed(self):
+        sections = toc.parse_rows(ROWS)
+        self.assertEqual([s['code'] for s in sections], ['1.1', '1.2', '1.3', '1.4', '1.5'])
+
+    def test_bare_list_is_accepted(self):
+        self.assertEqual(len(toc.parse_rows([{'sec': '2.1', 'pt': None}])), 1)
+
+    def test_rows_file_drives_the_exit_code(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'toc-final.json'
+            path.write_text(json.dumps(ROWS), encoding='utf-8')
+            buffer = io.StringIO()
+            import contextlib
+            with contextlib.redirect_stdout(buffer):
+                code = toc.main(['--rows', str(path), '--fail-if-unfinished'])
+            self.assertEqual(code, toc.EXIT_UNFINISHED)
+            self.assertIn('UNFINISHED_TASKS=4', buffer.getvalue())
+
+    def test_rows_and_snapshot_together_is_an_error(self):
+        buffer = io.StringIO()
+        import contextlib
+        with contextlib.redirect_stdout(buffer):
+            code = toc.main(['-', '--rows', 'x.json'])
+        self.assertEqual(code, 2)
+
+    def test_bad_rows_json_returns_two(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'toc.json'
+            path.write_text('{"rows": "not a list"}', encoding='utf-8')
+            buffer = io.StringIO()
+            import contextlib
+            with contextlib.redirect_stdout(buffer):
+                code = toc.main(['--rows', str(path)])
+            self.assertEqual(code, 2)
+            self.assertIn('cannot read rows', buffer.getvalue())
+
+
 def make_session(events):
     import zstandard
     payload = '\n'.join(json.dumps(event, ensure_ascii=False) for event in events).encode('utf-8')

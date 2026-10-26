@@ -1,9 +1,18 @@
-"""Read a course TOC from an accessibility snapshot and report unfinished task points.
+"""Read a course TOC and report unfinished task points.
 
-The v24 catalogue renders each section as `link "1.3.2 照亮地球内部的明灯 1"`; the
-trailing number is the count of unfinished task points. A section without the
-number is fully complete. This is the cheapest completion check the platform
-offers, and it must be read from a freshly loaded page.
+Two input shapes are supported:
+
+* an accessibility snapshot, where the v24 catalogue renders each section as
+  `link "1.3.2 照亮地球内部的明灯 1"` and the trailing number is the count of
+  unfinished task points;
+* `--rows FILE`, the run-local TOC dump most node drivers already write
+  (`{"rows": [{"sec": "1.3.2", "name": "...", "pt": null}]}`), where `pt` is the
+  text of the remaining-points span and `null`/`0` means clear.
+
+A section without a number is fully complete. This is the cheapest completion
+check the platform offers, and it must be read from a freshly loaded page: a
+`pt` that has not re-rendered yet can still look empty right after a submit, so
+re-read at the end of a batch before recording a section as done.
 """
 
 import argparse
@@ -37,6 +46,36 @@ def parse_snapshot(text):
         record = {'code': code, 'title': rest, 'unfinished': unfinished}
         seen[code] = record
         sections.append(record)
+    return sections
+
+
+def parse_rows(data):
+    """Return [{code, title, unfinished}] from a run-local TOC dump.
+
+    Accepts `{"rows": [...]}` or a bare list. `pt` is the text of the
+    remaining-points span: `null`/empty means clear, otherwise the first integer
+    is taken (drivers sometimes keep the label `1个待完成任务点`).
+    """
+    rows = data.get('rows') if isinstance(data, dict) else data
+    if not isinstance(rows, list):
+        raise ValueError('rows is not a list')
+    sections = []
+    seen = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        code = str(row.get('sec') or row.get('code') or '').strip()
+        if not code or code in seen:
+            continue
+        title = str(row.get('name') or row.get('title') or '').strip()
+        raw = row.get('pt', row.get('unfinished'))
+        if raw is None:
+            unfinished = 0
+        else:
+            match = re.search(r'\d+', str(raw))
+            unfinished = int(match.group(0)) if match else 0
+        seen.add(code)
+        sections.append({'code': code, 'title': title, 'unfinished': unfinished})
     return sections
 
 
@@ -75,25 +114,44 @@ def brief(report):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('snapshot', help='Accessibility snapshot text file, or - for stdin')
+    parser.add_argument('snapshot', nargs='?', help='Accessibility snapshot text file, or - for stdin')
+    parser.add_argument('--rows', help='Run-local TOC dump JSON: {"rows": [{"sec", "name", "pt"}]}')
     parser.add_argument('--prefix', help='Only sections under this code, e.g. 1.3')
     parser.add_argument('--json', action='store_true', help='Full JSON instead of the brief table')
     parser.add_argument('--fail-if-unfinished', action='store_true',
                         help='Exit 5 when any task point is still unfinished')
     args = parser.parse_args(argv)
 
-    if args.snapshot == '-':
-        text = sys.stdin.read()
-    else:
-        path = Path(args.snapshot)
-        if not path.is_file():
-            print(json.dumps({'status': 'error', 'error': 'snapshot not found: ' + str(path)}, ensure_ascii=False))
-            return 2
-        text = path.read_text(encoding='utf-8', errors='replace')
+    if bool(args.snapshot) == bool(args.rows):
+        print(json.dumps({'status': 'error', 'error': 'give exactly one input: snapshot or --rows'},
+                         ensure_ascii=False))
+        return 2
 
-    sections = parse_snapshot(text)
+    if args.rows:
+        path = Path(args.rows)
+        if not path.is_file():
+            print(json.dumps({'status': 'error', 'error': 'rows not found: ' + str(path)}, ensure_ascii=False))
+            return 2
+        try:
+            sections = parse_rows(json.loads(path.read_text(encoding='utf-8', errors='replace')))
+        except ValueError as error:
+            print(json.dumps({'status': 'error', 'error': 'cannot read rows: ' + str(error)},
+                             ensure_ascii=False))
+            return 2
+    else:
+        if args.snapshot == '-':
+            text = sys.stdin.read()
+        else:
+            path = Path(args.snapshot)
+            if not path.is_file():
+                print(json.dumps({'status': 'error', 'error': 'snapshot not found: ' + str(path)}, ensure_ascii=False))
+                return 2
+            text = path.read_text(encoding='utf-8', errors='replace')
+        sections = parse_snapshot(text)
+
     if not sections:
-        print(json.dumps({'status': 'error', 'error': 'no section links found; snapshot may be a different page'},
+        print(json.dumps({'status': 'error',
+                          'error': 'no sections found; snapshot or rows may be a different page'},
                          ensure_ascii=False))
         return 2
     if args.prefix:
