@@ -52,9 +52,12 @@ def parse_snapshot(text):
 def parse_rows(data):
     """Return [{code, title, unfinished}] from a run-local TOC dump.
 
-    Accepts `{"rows": [...]}` or a bare list. `pt` is the text of the
-    remaining-points span: `null`/empty means clear, otherwise the first integer
-    is taken (drivers sometimes keep the label `1个待完成任务点`).
+    Accepts `{"rows": [...]}` or a bare list, and both row shapes the drivers
+    produce: dicts (`{"sec", "name", "pt"}`) and the 4-tuple the read-only TOC
+    probe returns (`["7.4", "乙瑛碑", "2", "c-1"]`, cid optional).
+    `pt` is the text of the remaining-points span: `null`/empty means clear,
+    otherwise the first integer is taken (drivers sometimes keep the label
+    `1个待完成任务点`).
     """
     rows = data.get('rows') if isinstance(data, dict) else data
     if not isinstance(rows, list):
@@ -62,13 +65,18 @@ def parse_rows(data):
     sections = []
     seen = set()
     for row in rows:
-        if not isinstance(row, dict):
+        if isinstance(row, (list, tuple)):
+            if len(row) < 2:
+                continue
+            code, title, raw = str(row[0] or '').strip(), str(row[1] or '').strip(), row[2] if len(row) > 2 else None
+        elif isinstance(row, dict):
+            code = str(row.get('sec') or row.get('code') or '').strip()
+            title = str(row.get('name') or row.get('title') or '').strip()
+            raw = row.get('pt', row.get('unfinished'))
+        else:
             continue
-        code = str(row.get('sec') or row.get('code') or '').strip()
         if not code or code in seen:
             continue
-        title = str(row.get('name') or row.get('title') or '').strip()
-        raw = row.get('pt', row.get('unfinished'))
         if raw is None:
             unfinished = 0
         else:

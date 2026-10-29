@@ -125,6 +125,14 @@ class TocRowsTest(unittest.TestCase):
     def test_bare_list_is_accepted(self):
         self.assertEqual(len(toc.parse_rows([{'sec': '2.1', 'pt': None}])), 1)
 
+    def test_probe_tuple_rows_are_accepted(self):
+        data = {'rows': [['1.1', '绪论', '2', 'c-1'], ['1.2', '简史', None, 'c-2'], ['9.9']]}
+        sections = toc.parse_rows(data)
+        self.assertEqual([s['code'] for s in sections], ['1.1', '1.2'])
+        self.assertEqual(sections[0]['unfinished'], 2)
+        self.assertEqual(sections[1]['unfinished'], 0)
+        self.assertEqual(sections[0]['title'], '绪论')
+
     def test_rows_file_drives_the_exit_code(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / 'toc-final.json'
